@@ -18,6 +18,9 @@ build/
 *.local
 *.log
 
+# Uploads & Media
+uploads/
+
 # IDE & OS
 .idea/
 .vscode/

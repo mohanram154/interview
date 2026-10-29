@@ -503,6 +503,7 @@ public class AssessmentSessionService {
         resp.setCreatedAt(session.getCreatedAt());
         resp.setUpdatedAt(session.getUpdatedAt());
         resp.setCompletedAt(session.getCompletedAt());
+        resp.setVideoConsentGivenAt(session.getVideoConsentGivenAt());
 
         return resp;
     }

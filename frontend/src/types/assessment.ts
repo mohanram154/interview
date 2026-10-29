@@ -60,6 +60,7 @@ export interface AssessmentSession {
   videoCommunicationScore?: number;
   videoSentimentLabel?: string;
   videoFeedback?: string;
+  videoConsentGivenAt?: string;
   videoCompletedAt?: string;
   videoUnlocked: boolean;
 
@@ -192,4 +193,32 @@ export interface ResumeEvaluationResult {
   evaluationBenchmark: string;
   benchmarkNote: string;
   completedAt: string;
+}
+
+export interface VideoQuestion {
+  id: number;
+  assessmentSessionId: number;
+  sequenceNumber: number;
+  questionText: string;
+  category: string;
+  tailoredSource?: string;
+  status: 'PENDING' | 'RECORDED' | 'UPLOADED';
+  hasRecording: boolean;
+  recordingDurationSeconds?: number;
+  recordingFileSize?: number;
+  recordingMimeType?: string;
+  uploadedAt?: string;
+}
+
+export interface VideoInterviewStatus {
+  sessionId: number;
+  jobRoleName: string;
+  difficulty: string;
+  stageStatus: StageStatus;
+  consentGiven: boolean;
+  consentGivenAt?: string;
+  totalQuestions: number;
+  uploadedQuestions: number;
+  allQuestionsUploaded: boolean;
+  questions: VideoQuestion[];
 }

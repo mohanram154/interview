@@ -86,6 +86,9 @@ public class AssessmentSession {
     @Column(name = "video_feedback", columnDefinition = "TEXT")
     private String videoFeedback;
 
+    @Column(name = "video_consent_given_at")
+    private LocalDateTime videoConsentGivenAt;
+
     @Column(name = "video_completed_at")
     private LocalDateTime videoCompletedAt;
 
@@ -180,6 +183,9 @@ public class AssessmentSession {
 
     public String getVideoFeedback() { return videoFeedback; }
     public void setVideoFeedback(String videoFeedback) { this.videoFeedback = videoFeedback; }
+
+    public LocalDateTime getVideoConsentGivenAt() { return videoConsentGivenAt; }
+    public void setVideoConsentGivenAt(LocalDateTime videoConsentGivenAt) { this.videoConsentGivenAt = videoConsentGivenAt; }
 
     public LocalDateTime getVideoCompletedAt() { return videoCompletedAt; }
     public void setVideoCompletedAt(LocalDateTime videoCompletedAt) { this.videoCompletedAt = videoCompletedAt; }

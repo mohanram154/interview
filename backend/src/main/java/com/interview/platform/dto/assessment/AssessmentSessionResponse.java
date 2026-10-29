@@ -31,6 +31,7 @@ public class AssessmentSessionResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
+    private LocalDateTime videoConsentGivenAt;
 
     public static class RoundDetailDto {
         private String id; // "RESUME_EVALUATION", "MCQ_ASSESSMENT", "VIDEO_INTERVIEW"
@@ -156,6 +157,9 @@ public class AssessmentSessionResponse {
 
     public LocalDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+
+    public LocalDateTime getVideoConsentGivenAt() { return videoConsentGivenAt; }
+    public void setVideoConsentGivenAt(LocalDateTime videoConsentGivenAt) { this.videoConsentGivenAt = videoConsentGivenAt; }
 
     // Backward compatibility helper getters
     public String getResumeStageStatus() { return resumeRound != null ? resumeRound.getStatus() : "AVAILABLE"; }

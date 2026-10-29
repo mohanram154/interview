@@ -3,7 +3,9 @@ import {
   AssessmentSession, 
   CreateAssessmentSessionPayload, 
   ParsedResumeData, 
-  ResumeEvaluationResult 
+  ResumeEvaluationResult,
+  VideoQuestion,
+  VideoInterviewStatus
 } from '../types/assessment';
 
 export const assessmentApi = {
@@ -124,6 +126,62 @@ export const assessmentApi = {
 
   startOrResumeVideoRound: async (sessionId: number | string): Promise<AssessmentSession> => {
     const res = await apiClient.post<{ data: AssessmentSession }>(`/assessment-sessions/${sessionId}/video/start`);
+    return res.data.data;
+  },
+
+  recordVideoConsent: async (sessionId: number | string, consentGiven: boolean = true): Promise<VideoInterviewStatus> => {
+    const res = await apiClient.post<{ data: VideoInterviewStatus }>(
+      `/assessment-sessions/${sessionId}/video/consent`,
+      { consentGiven }
+    );
+    return res.data.data;
+  },
+
+  getVideoInterviewStatus: async (sessionId: number | string): Promise<VideoInterviewStatus> => {
+    const res = await apiClient.get<{ data: VideoInterviewStatus }>(
+      `/assessment-sessions/${sessionId}/video/status`
+    );
+    return res.data.data;
+  },
+
+  getVideoQuestions: async (sessionId: number | string): Promise<VideoQuestion[]> => {
+    const res = await apiClient.get<{ data: VideoQuestion[] }>(
+      `/assessment-sessions/${sessionId}/video/questions`
+    );
+    return res.data.data;
+  },
+
+  uploadVideoRecording: async (
+    sessionId: number | string,
+    questionId: number,
+    file: Blob | File,
+    durationSeconds: number,
+    onProgress?: (percent: number) => void
+  ): Promise<VideoQuestion> => {
+    const formData = new FormData();
+    formData.append('file', file, `answer_q${questionId}.webm`);
+    formData.append('duration', String(durationSeconds));
+
+    const res = await apiClient.post<{ data: VideoQuestion }>(
+      `/assessment-sessions/${sessionId}/video/questions/${questionId}/upload`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percent);
+          }
+        }
+      }
+    );
+    return res.data.data;
+  },
+
+  finishVideoInterview: async (sessionId: number | string): Promise<AssessmentSession> => {
+    const res = await apiClient.post<{ data: AssessmentSession }>(
+      `/assessment-sessions/${sessionId}/video/finish`
+    );
     return res.data.data;
   },
 
