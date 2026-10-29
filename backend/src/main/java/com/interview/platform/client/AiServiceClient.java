@@ -131,6 +131,37 @@ public class AiServiceClient {
         return defaultMsg;
     }
 
+    public Map<String, Object> analyzeVideoRecording(MultipartFile file, String transcript, String targetRole) {
+        String url = baseUrl + "/internal/video/analyze-recording";
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("file", new ByteArrayResource(file.getBytes()) {
+                @Override
+                public String getFilename() {
+                    return file.getOriginalFilename() != null ? file.getOriginalFilename() : "recording.webm";
+                }
+            });
+            if (transcript != null && !transcript.isBlank()) {
+                body.add("transcript", transcript);
+            }
+            if (targetRole != null && !targetRole.isBlank()) {
+                body.add("target_role", targetRole);
+            }
+
+            HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return (Map<String, Object>) response.getBody().get("data");
+            }
+        } catch (Exception e) {
+            log.warn("AI Service call to {} failed: {}. Continuing with standard recording persistence.", url, e.getMessage());
+        }
+        return Collections.emptyMap();
+    }
+
     private AiEvaluationResponse calculateBaselineFallback(AiEvaluationRequest request) {
         String answer = request.getAnswerText() != null ? request.getAnswerText().trim() : "";
         String topics = request.getExpectedTopics() != null ? request.getExpectedTopics().toLowerCase() : "";

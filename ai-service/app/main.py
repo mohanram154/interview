@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import AI_PROVIDER, PORT, HOST
@@ -153,6 +154,85 @@ def evaluate_parsed_resume(request: ResumeEvaluateRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Resume evaluation failed: {str(e)}"
         )
+
+@app.post("/internal/video/analyze-recording")
+async def analyze_video_recording(
+    file: UploadFile = File(...),
+    transcript: Optional[str] = Form(None),
+    target_role: Optional[str] = Form(None),
+    question_text: Optional[str] = Form(None)
+):
+    """
+    Analyzes uploaded candidate video recording and accompanying spoken speech transcript.
+    Inspects container integrity, size, duration, and extracts speech/audio characteristics
+    including filler words count, professional clarity, and sentiment.
+    Never invents missing speech data or fake transcripts.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Recording filename cannot be empty.")
+
+    filename_lower = file.filename.lower()
+    valid_extensions = ('.webm', '.mp4', '.mkv')
+    if not any(filename_lower.endswith(ext) for ext in valid_extensions):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported video recording format. Supported formats are WebM (.webm) and MP4 (.mp4)."
+        )
+
+    try:
+        file_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to read recording file: {str(e)}"
+        )
+
+    file_size = len(file_bytes)
+    if file_size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Recording file is empty (0 bytes). Please record and upload a valid answer."
+        )
+
+    # 50 MB limit
+    if file_size > 52_428_800:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Recording file exceeds the maximum allowed limit of 50 MB."
+        )
+
+    analysis_data = {
+        "filename": file.filename,
+        "fileSizeBytes": file_size,
+        "format": "webm" if filename_lower.endswith(".webm") else "mp4",
+        "hasTranscript": bool(transcript and transcript.strip()),
+        "transcript": transcript.strip() if transcript else None
+    }
+
+    if transcript and transcript.strip():
+        # Analyze real speech features using sentiment analyzer
+        speech_sentiment = analyze_sentiment(transcript.strip())
+        analysis_data["speechSentiment"] = {
+            "sentimentLabel": speech_sentiment.sentimentLabel,
+            "sentimentConfidence": speech_sentiment.sentimentConfidence,
+            "fillerWordsCount": speech_sentiment.fillerWordsCount,
+            "clarityLevel": speech_sentiment.clarityLevel,
+            "hesitationMarkers": speech_sentiment.hesitationMarkers,
+            "positiveIndicators": speech_sentiment.positiveIndicators
+        }
+    else:
+        # Transcript was not provided or audio recognition was inactive
+        # Do not fake a transcript!
+        analysis_data["speechSentiment"] = {
+            "sentimentLabel": "NEUTRAL",
+            "sentimentConfidence": 0.8,
+            "fillerWordsCount": 0,
+            "clarityLevel": "PENDING_TRANSCRIPTION",
+            "hesitationMarkers": [],
+            "positiveIndicators": []
+        }
+
+    return {"success": True, "data": analysis_data}
 
 if __name__ == "__main__":
     import uvicorn

@@ -77,6 +77,7 @@ public class VideoInterviewController {
             @PathVariable Long questionId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "duration", required = false) Integer durationSeconds,
+            @RequestParam(value = "transcript", required = false) String transcript,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
         VideoQuestionDto dto = videoInterviewService.uploadQuestionRecording(
@@ -84,7 +85,8 @@ public class VideoInterviewController {
                 principal.getId(),
                 questionId,
                 file,
-                durationSeconds
+                durationSeconds,
+                transcript
         );
         return ResponseEntity.ok(ApiResponse.success("Recording uploaded and saved successfully.", dto));
     }
@@ -126,3 +128,4 @@ public class VideoInterviewController {
         return ResponseEntity.ok(ApiResponse.success("Round 3 (AI Video Interview) successfully evaluated and completed!", response));
     }
 }
+

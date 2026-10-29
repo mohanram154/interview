@@ -204,12 +204,12 @@ def run_tests():
     print(f"       Q2 [{q2['category']}]: {q2['questionText']}")
 
     # =========================================================================
-    # CHECKPOINT 3: Answer Recording Upload
+    # CHECKPOINT 3: Answer Recording Upload & Speech Analytics
     # =========================================================================
     dummy_webm_bytes = b"G__WEBM_MOCK_HEADER__VIDEODATA__" * 100
     files1 = {"file": ("answer_q1.webm", dummy_webm_bytes, "video/webm")}
     upload_q1 = api_call(
-        f"/assessment-sessions/{session_id}/video/questions/{q1['id']}/upload?duration=45",
+        f"/assessment-sessions/{session_id}/video/questions/{q1['id']}/upload?duration=45&transcript=I+structured+the+solution+using+clean+SOLID+principles+and+scalable+microservices",
         method="POST",
         files=files1,
         token=token
@@ -219,7 +219,10 @@ def run_tests():
     assert q1_result["status"] == "UPLOADED"
     assert q1_result["hasRecording"] is True
     assert q1_result["recordingDurationSeconds"] == 45
+    assert q1_result["speechClarityLevel"] is not None
+    assert q1_result["sentimentLabel"] in ["POSITIVE", "CONFIDENT", "NEUTRAL"]
     print(f"[PASS] Checkpoint 3A: Answer recording uploaded for Q1 ({q1_result['recordingFileSize']} bytes).")
+    print(f"       Speech Analysis: Clarity={q1_result['speechClarityLevel']}, Sentiment={q1_result['sentimentLabel']}, Fillers={q1_result.get('fillerWordsCount', 0)}")
 
     # Upload Q2
     files2 = {"file": ("answer_q2.webm", dummy_webm_bytes, "video/webm")}

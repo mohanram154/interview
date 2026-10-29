@@ -41,6 +41,18 @@ public class VideoInterviewQuestion {
     @Column(name = "recording_mime_type", length = 100)
     private String recordingMimeType;
 
+    @Column(columnDefinition = "TEXT")
+    private String transcript;
+
+    @Column(name = "filler_words_count")
+    private Integer fillerWordsCount;
+
+    @Column(name = "speech_clarity_level", length = 50)
+    private String speechClarityLevel;
+
+    @Column(name = "sentiment_label", length = 50)
+    private String sentimentLabel;
+
     @Column(nullable = false, length = 50)
     private String status = "PENDING";
 
@@ -140,6 +152,38 @@ public class VideoInterviewQuestion {
         this.recordingMimeType = recordingMimeType;
     }
 
+    public String getTranscript() {
+        return transcript;
+    }
+
+    public void setTranscript(String transcript) {
+        this.transcript = transcript;
+    }
+
+    public Integer getFillerWordsCount() {
+        return fillerWordsCount;
+    }
+
+    public void setFillerWordsCount(Integer fillerWordsCount) {
+        this.fillerWordsCount = fillerWordsCount;
+    }
+
+    public String getSpeechClarityLevel() {
+        return speechClarityLevel;
+    }
+
+    public void setSpeechClarityLevel(String speechClarityLevel) {
+        this.speechClarityLevel = speechClarityLevel;
+    }
+
+    public String getSentimentLabel() {
+        return sentimentLabel;
+    }
+
+    public void setSentimentLabel(String sentimentLabel) {
+        this.sentimentLabel = sentimentLabel;
+    }
+
     public String getStatus() {
         return status;
     }
@@ -172,3 +216,4 @@ public class VideoInterviewQuestion {
         this.updatedAt = updatedAt;
     }
 }
+

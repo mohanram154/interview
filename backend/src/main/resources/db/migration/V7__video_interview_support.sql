@@ -23,3 +23,4 @@ CREATE TABLE IF NOT EXISTS video_interview_questions (
     INDEX idx_viq_session (assessment_session_id),
     CONSTRAINT uk_viq_session_seq UNIQUE (assessment_session_id, sequence_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

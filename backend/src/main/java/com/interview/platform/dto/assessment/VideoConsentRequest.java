@@ -33,3 +33,4 @@ public class VideoConsentRequest {
         this.notes = notes;
     }
 }
+

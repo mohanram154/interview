@@ -2,6 +2,7 @@ package com.interview.platform.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interview.platform.client.AiServiceClient;
 import com.interview.platform.dto.assessment.AssessmentSessionResponse;
 import com.interview.platform.dto.assessment.VideoConsentRequest;
 import com.interview.platform.dto.assessment.VideoInterviewStatusResponse;
@@ -44,6 +45,7 @@ public class VideoInterviewService {
     private final AssessmentSessionService assessmentSessionService;
     private final VideoInterviewQuestionRepository videoInterviewQuestionRepository;
     private final ResumeEvaluationRepository resumeEvaluationRepository;
+    private final AiServiceClient aiServiceClient;
     private final ObjectMapper objectMapper;
     private final String uploadBaseDir;
 
@@ -52,6 +54,7 @@ public class VideoInterviewService {
             AssessmentSessionService assessmentSessionService,
             VideoInterviewQuestionRepository videoInterviewQuestionRepository,
             ResumeEvaluationRepository resumeEvaluationRepository,
+            AiServiceClient aiServiceClient,
             ObjectMapper objectMapper,
             @Value("${app.upload.video-dir:./uploads/video_recordings}") String uploadBaseDir
     ) {
@@ -59,6 +62,7 @@ public class VideoInterviewService {
         this.assessmentSessionService = assessmentSessionService;
         this.videoInterviewQuestionRepository = videoInterviewQuestionRepository;
         this.resumeEvaluationRepository = resumeEvaluationRepository;
+        this.aiServiceClient = aiServiceClient;
         this.objectMapper = objectMapper;
         this.uploadBaseDir = uploadBaseDir;
     }
@@ -130,6 +134,23 @@ public class VideoInterviewService {
             MultipartFile file,
             Integer durationSeconds
     ) {
+        return uploadQuestionRecording(sessionId, userId, questionId, file, durationSeconds, null);
+    }
+
+    /**
+     * Uploads and securely stores candidate video recording for a specific question.
+     * Integrates with FastAPI service for speech characteristics and container inspection.
+     * Validates size (<= 50MB), MIME type, ownership, and prerequisite locking.
+     */
+    @Transactional
+    public VideoQuestionDto uploadQuestionRecording(
+            Long sessionId,
+            Long userId,
+            Long questionId,
+            MultipartFile file,
+            Integer durationSeconds,
+            String transcript
+    ) {
         AssessmentSession session = getSessionEntity(sessionId, userId);
         assessmentSessionService.validateStageAccess(session, "VIDEO_INTERVIEW");
 
@@ -181,6 +202,35 @@ public class VideoInterviewService {
             question.setRecordingMimeType(contentType != null ? contentType : "video/webm");
             question.setStatus("UPLOADED");
             question.setUploadedAt(LocalDateTime.now());
+
+            if (transcript != null && !transcript.isBlank()) {
+                question.setTranscript(transcript.trim());
+            }
+
+            // Integrate with FastAPI service to analyze speech characteristics
+            try {
+                String roleName = session.getJobRole() != null ? session.getJobRole().getName() : "Software Developer";
+                Map<String, Object> aiAnalysis = aiServiceClient.analyzeVideoRecording(file, transcript, roleName);
+                if (aiAnalysis != null && aiAnalysis.containsKey("speechSentiment")) {
+                    Map<String, Object> sentimentData = (Map<String, Object>) aiAnalysis.get("speechSentiment");
+                    if (sentimentData != null) {
+                        Object fillerObj = sentimentData.get("fillerWordsCount");
+                        if (fillerObj instanceof Number) {
+                            question.setFillerWordsCount(((Number) fillerObj).intValue());
+                        }
+                        Object clarityObj = sentimentData.get("clarityLevel");
+                        if (clarityObj != null) {
+                            question.setSpeechClarityLevel(clarityObj.toString());
+                        }
+                        Object sentObj = sentimentData.get("sentimentLabel");
+                        if (sentObj != null) {
+                            question.setSentimentLabel(sentObj.toString());
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("FastAPI video recording analysis error: {}. Preserving recording without fake transcript.", ex.getMessage());
+            }
 
             VideoInterviewQuestion saved = videoInterviewQuestionRepository.save(question);
             log.info("Saved video recording for session {} question {} ({}) to {}", sessionId, questionId, question.getSequenceNumber(), targetPath);
@@ -515,6 +565,10 @@ public class VideoInterviewService {
         dto.setRecordingDurationSeconds(q.getRecordingDurationSeconds());
         dto.setRecordingFileSize(q.getRecordingFileSize());
         dto.setRecordingMimeType(q.getRecordingMimeType());
+        dto.setTranscript(q.getTranscript());
+        dto.setFillerWordsCount(q.getFillerWordsCount());
+        dto.setSpeechClarityLevel(q.getSpeechClarityLevel());
+        dto.setSentimentLabel(q.getSentimentLabel());
         dto.setUploadedAt(q.getUploadedAt());
         return dto;
     }

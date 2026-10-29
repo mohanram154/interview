@@ -207,6 +207,10 @@ export interface VideoQuestion {
   recordingDurationSeconds?: number;
   recordingFileSize?: number;
   recordingMimeType?: string;
+  transcript?: string;
+  fillerWordsCount?: number;
+  speechClarityLevel?: string;
+  sentimentLabel?: string;
   uploadedAt?: string;
 }
 

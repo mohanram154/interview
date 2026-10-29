@@ -15,6 +15,10 @@ public class VideoQuestionDto {
     private Integer recordingDurationSeconds;
     private Long recordingFileSize;
     private String recordingMimeType;
+    private String transcript;
+    private Integer fillerWordsCount;
+    private String speechClarityLevel;
+    private String sentimentLabel;
     private LocalDateTime uploadedAt;
 
     public VideoQuestionDto() {}
@@ -107,6 +111,38 @@ public class VideoQuestionDto {
         this.recordingMimeType = recordingMimeType;
     }
 
+    public String getTranscript() {
+        return transcript;
+    }
+
+    public void setTranscript(String transcript) {
+        this.transcript = transcript;
+    }
+
+    public Integer getFillerWordsCount() {
+        return fillerWordsCount;
+    }
+
+    public void setFillerWordsCount(Integer fillerWordsCount) {
+        this.fillerWordsCount = fillerWordsCount;
+    }
+
+    public String getSpeechClarityLevel() {
+        return speechClarityLevel;
+    }
+
+    public void setSpeechClarityLevel(String speechClarityLevel) {
+        this.speechClarityLevel = speechClarityLevel;
+    }
+
+    public String getSentimentLabel() {
+        return sentimentLabel;
+    }
+
+    public void setSentimentLabel(String sentimentLabel) {
+        this.sentimentLabel = sentimentLabel;
+    }
+
     public LocalDateTime getUploadedAt() {
         return uploadedAt;
     }
@@ -115,3 +151,4 @@ public class VideoQuestionDto {
         this.uploadedAt = uploadedAt;
     }
 }
+

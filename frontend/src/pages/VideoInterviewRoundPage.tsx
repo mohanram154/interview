@@ -79,6 +79,7 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
   const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedPreviewUrl, setRecordedPreviewUrl] = useState<string | null>(null);
+  const [candidateNotes, setCandidateNotes] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isFinishing, setIsFinishing] = useState<boolean>(false);
@@ -370,12 +371,14 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
         activeQuestion.id,
         recordedBlob,
         recordingSeconds,
+        candidateNotes,
         (percent) => setUploadProgress(percent)
       );
 
       // Update question list locally
       setQuestions(prev => prev.map(q => q.id === updatedQuestion.id ? updatedQuestion : q));
       setRecordedBlob(null);
+      setCandidateNotes('');
       if (recordedPreviewUrl) {
         URL.revokeObjectURL(recordedPreviewUrl);
         setRecordedPreviewUrl(null);
@@ -992,7 +995,36 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
                       <span className="font-bold text-amber-700">Pending Answer</span>
                     )}
                   </div>
+
+                  {activeQuestion?.status === 'UPLOADED' && (
+                    <div className="pt-2 border-t border-violet-100 space-y-1 text-[11px]">
+                      <div className="flex items-center justify-between text-gray-600">
+                        <span>Speech Articulation:</span>
+                        <strong className="text-emerald-700 font-bold">{activeQuestion.speechClarityLevel || 'HIGH'}</strong>
+                      </div>
+                      <div className="flex items-center justify-between text-gray-600">
+                        <span>Filler Words:</span>
+                        <strong className="text-gray-900">{activeQuestion.fillerWordsCount ?? 0}</strong>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                {/* Spoken Notes / Transcript Outline */}
+                {activeQuestion?.status !== 'UPLOADED' && !isRecording && (
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700 block">
+                      Spoken Notes / Key Technical Outline (Optional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={candidateNotes}
+                      onChange={(e) => setCandidateNotes(e.target.value)}
+                      placeholder="Outline key architectural concepts discussed in this take..."
+                      className="w-full text-xs p-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none"
+                    />
+                  </div>
+                )}
 
                 {/* Upload Progress Bar */}
                 {isUploading && (

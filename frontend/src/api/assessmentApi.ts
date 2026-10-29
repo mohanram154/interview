@@ -156,11 +156,15 @@ export const assessmentApi = {
     questionId: number,
     file: Blob | File,
     durationSeconds: number,
+    transcript?: string,
     onProgress?: (percent: number) => void
   ): Promise<VideoQuestion> => {
     const formData = new FormData();
     formData.append('file', file, `answer_q${questionId}.webm`);
     formData.append('duration', String(durationSeconds));
+    if (transcript && transcript.trim()) {
+      formData.append('transcript', transcript.trim());
+    }
 
     const res = await apiClient.post<{ data: VideoQuestion }>(
       `/assessment-sessions/${sessionId}/video/questions/${questionId}/upload`,

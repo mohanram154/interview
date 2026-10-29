@@ -1,6 +1,7 @@
 package com.interview.platform;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interview.platform.client.AiServiceClient;
 import com.interview.platform.dto.assessment.AssessmentSessionResponse;
 import com.interview.platform.dto.assessment.VideoConsentRequest;
 import com.interview.platform.dto.assessment.VideoInterviewStatusResponse;
@@ -50,6 +51,9 @@ public class VideoInterviewServiceTest {
     @Mock
     private ResumeEvaluationRepository resumeEvaluationRepository;
 
+    @Mock
+    private AiServiceClient aiServiceClient;
+
     @TempDir
     Path tempDir;
 
@@ -68,6 +72,7 @@ public class VideoInterviewServiceTest {
                 assessmentSessionService,
                 videoInterviewQuestionRepository,
                 resumeEvaluationRepository,
+                aiServiceClient,
                 objectMapper,
                 tempDir.toString()
         );
@@ -183,13 +188,21 @@ public class VideoInterviewServiceTest {
                 "file", "answer.webm", "video/webm", "mock video content bytes".getBytes()
         );
 
-        VideoQuestionDto result = videoInterviewService.uploadQuestionRecording(100L, 10L, 50L, file, 75);
+        when(aiServiceClient.analyzeVideoRecording(any(), any(), any())).thenReturn(Map.of(
+                "speechSentiment", Map.of("fillerWordsCount", 1, "clarityLevel", "HIGH", "sentimentLabel", "CONFIDENT")
+        ));
+
+        VideoQuestionDto result = videoInterviewService.uploadQuestionRecording(100L, 10L, 50L, file, 75, "My architectural solution is scalable");
 
         assertNotNull(result);
         assertEquals("UPLOADED", result.getStatus());
         assertTrue(result.isHasRecording());
         assertEquals(75, result.getRecordingDurationSeconds());
         assertEquals(file.getSize(), result.getRecordingFileSize());
+        assertEquals(1, result.getFillerWordsCount());
+        assertEquals("HIGH", result.getSpeechClarityLevel());
+        assertEquals("CONFIDENT", result.getSentimentLabel());
+        assertEquals("My architectural solution is scalable", result.getTranscript());
         assertNotNull(result.getUploadedAt());
     }
 
@@ -259,3 +272,4 @@ public class VideoInterviewServiceTest {
         assertThrows(BadRequestException.class, () -> videoInterviewService.finishVideoInterview(100L, 10L));
     }
 }
+

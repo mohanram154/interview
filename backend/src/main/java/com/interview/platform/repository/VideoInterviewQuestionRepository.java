@@ -18,3 +18,4 @@ public interface VideoInterviewQuestionRepository extends JpaRepository<VideoInt
 
     long countByAssessmentSessionId(Long assessmentSessionId);
 }
+
