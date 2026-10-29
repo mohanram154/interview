@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+target/
+venv/
+.venv/
+ai-service/venv/
+__pycache__/
+*.pyc
+
+# Builds
+dist/
+build/
+*.jar
+*.class
+
+# Environment and Secrets
+.env
+*.local
+*.log
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.DS_Store
+Thumbs.db
