@@ -6,9 +6,25 @@ export type AssessmentStage =
 
 export type StageStatus = 
   | 'LOCKED' 
-  | 'NOT_STARTED' 
+  | 'AVAILABLE' 
   | 'IN_PROGRESS' 
-  | 'COMPLETED';
+  | 'COMPLETED' 
+  | 'FAILED'
+  | 'NOT_STARTED';
+
+export interface RoundDetail {
+  stageKey: string;
+  title: string;
+  description: string;
+  roundNumber: number;
+  status: StageStatus;
+  unlocked: boolean;
+  lockMessage?: string;
+  score?: number;
+  completedAt?: string;
+  actionLabel: string;
+  actionRoute: string;
+}
 
 export interface AssessmentSession {
   id: number;
@@ -50,6 +66,12 @@ export interface AssessmentSession {
   finalCompositeScore?: number;
   finalSummary?: string;
   finalReportUnlocked: boolean;
+
+  progressText?: string;
+  activeRoundNumber?: number;
+  resumeRound?: RoundDetail;
+  mcqRound?: RoundDetail;
+  videoRound?: RoundDetail;
 
   createdAt: string;
   updatedAt: string;

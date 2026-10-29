@@ -1,8 +1,12 @@
 package com.interview.platform.controller;
 
 import com.interview.platform.dto.assessment.AssessmentSessionResponse;
+import com.interview.platform.dto.assessment.CompleteMcqStageRequest;
+import com.interview.platform.dto.assessment.CompleteResumeStageRequest;
+import com.interview.platform.dto.assessment.CompleteVideoStageRequest;
 import com.interview.platform.dto.assessment.CreateAssessmentSessionRequest;
 import com.interview.platform.dto.common.ApiResponse;
+import com.interview.platform.dto.interview.InterviewResponse;
 import com.interview.platform.entity.AssessmentSession;
 import com.interview.platform.security.UserPrincipal;
 import com.interview.platform.service.AssessmentSessionService;
@@ -74,6 +78,92 @@ public class AssessmentSessionController {
         return ResponseEntity.ok(ApiResponse.success("Stage access granted", true));
     }
 
+    @PutMapping("/{id}/resume/start")
+    public ResponseEntity<ApiResponse<AssessmentSessionResponse>> startResumeRound(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        AssessmentSessionResponse response = assessmentSessionService.startResumeRound(id, principal.getId());
+        return ResponseEntity.ok(ApiResponse.success("Resume evaluation round started", response));
+    }
+
+    @PostMapping("/{id}/resume/complete")
+    public ResponseEntity<ApiResponse<AssessmentSessionResponse>> completeResumeRound(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody CompleteResumeStageRequest request
+    ) {
+        AssessmentSessionResponse response = assessmentSessionService.completeResumeStage(
+                id,
+                principal.getId(),
+                request.getScore(),
+                request.getSkillsMatchScore(),
+                request.getExperienceScore(),
+                request.getFeedback(),
+                request.getFilename()
+        );
+        return ResponseEntity.ok(ApiResponse.success("Resume evaluation completed; MCQ Technical Assessment unlocked!", response));
+    }
+
+    @PostMapping("/{id}/mcq/start")
+    public ResponseEntity<ApiResponse<InterviewResponse>> startOrResumeMcqRound(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        InterviewResponse response = assessmentSessionService.startOrResumeMcqRound(id, principal.getId());
+        return ResponseEntity.ok(ApiResponse.success("MCQ Technical Assessment initialized or resumed", response));
+    }
+
+    @PostMapping("/{id}/mcq/complete")
+    public ResponseEntity<ApiResponse<AssessmentSessionResponse>> completeMcqRound(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestBody(required = false) CompleteMcqStageRequest request
+    ) {
+        Long interviewId = request != null ? request.getMcqInterviewId() : null;
+        Double score = request != null ? request.getScore() : null;
+        AssessmentSessionResponse response = assessmentSessionService.completeMcqStage(id, principal.getId(), interviewId, score);
+        return ResponseEntity.ok(ApiResponse.success("MCQ Technical Assessment completed; AI Video Interview unlocked!", response));
+    }
+
+    @PostMapping("/{id}/video/start")
+    public ResponseEntity<ApiResponse<AssessmentSessionResponse>> startOrResumeVideoRound(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        AssessmentSessionResponse response = assessmentSessionService.startOrResumeVideoRound(id, principal.getId());
+        return ResponseEntity.ok(ApiResponse.success("AI Video Interview round started or resumed", response));
+    }
+
+    @PostMapping("/{id}/video/complete")
+    public ResponseEntity<ApiResponse<AssessmentSessionResponse>> completeVideoRound(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody CompleteVideoStageRequest request
+    ) {
+        AssessmentSessionResponse response = assessmentSessionService.completeVideoStage(
+                id,
+                principal.getId(),
+                request.getScore(),
+                request.getTechnicalScore(),
+                request.getCommunicationScore(),
+                request.getSentimentLabel(),
+                request.getFeedback()
+        );
+        return ResponseEntity.ok(ApiResponse.success("AI Video Interview completed; Final Combined Report generated!", response));
+    }
+
+    @GetMapping("/{id}/report")
+    public ResponseEntity<ApiResponse<AssessmentSessionResponse>> getFinalReport(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        AssessmentSessionResponse response = assessmentSessionService.getSessionById(id, principal.getId());
+        // Validate all 3 rounds completed before giving report
+        assessmentSessionService.validateStageAccess(toEntitySnapshot(response), "FINAL_REPORT");
+        return ResponseEntity.ok(ApiResponse.success("Final Combined Assessment Report retrieved", response));
+    }
+
     private AssessmentSession toEntitySnapshot(AssessmentSessionResponse resp) {
         AssessmentSession s = new AssessmentSession();
         s.setId(resp.getId());
@@ -87,3 +177,4 @@ public class AssessmentSessionController {
         return s;
     }
 }
+

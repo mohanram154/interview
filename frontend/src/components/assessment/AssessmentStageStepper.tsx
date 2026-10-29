@@ -170,3 +170,4 @@ export const AssessmentStageStepper: React.FC<AssessmentStageStepperProps> = ({
     </div>
   );
 };
+

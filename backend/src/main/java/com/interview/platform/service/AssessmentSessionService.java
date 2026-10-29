@@ -2,14 +2,18 @@ package com.interview.platform.service;
 
 import com.interview.platform.dto.assessment.AssessmentSessionResponse;
 import com.interview.platform.dto.assessment.CreateAssessmentSessionRequest;
+import com.interview.platform.dto.interview.CreateInterviewRequest;
+import com.interview.platform.dto.interview.InterviewResponse;
 import com.interview.platform.entity.AssessmentSession;
 import com.interview.platform.entity.Interview;
+import com.interview.platform.entity.InterviewReport;
 import com.interview.platform.entity.JobRole;
 import com.interview.platform.entity.User;
 import com.interview.platform.exception.BadRequestException;
 import com.interview.platform.exception.ResourceNotFoundException;
 import com.interview.platform.exception.UnauthorizedAccessException;
 import com.interview.platform.repository.AssessmentSessionRepository;
+import com.interview.platform.repository.InterviewReportRepository;
 import com.interview.platform.repository.InterviewRepository;
 import com.interview.platform.repository.JobRoleRepository;
 import com.interview.platform.repository.UserRepository;
@@ -27,17 +31,23 @@ public class AssessmentSessionService {
     private final UserRepository userRepository;
     private final JobRoleRepository jobRoleRepository;
     private final InterviewRepository interviewRepository;
+    private final InterviewReportRepository interviewReportRepository;
+    private final InterviewService interviewService;
 
     public AssessmentSessionService(
             AssessmentSessionRepository assessmentSessionRepository,
             UserRepository userRepository,
             JobRoleRepository jobRoleRepository,
-            InterviewRepository interviewRepository
+            InterviewRepository interviewRepository,
+            InterviewReportRepository interviewReportRepository,
+            InterviewService interviewService
     ) {
         this.assessmentSessionRepository = assessmentSessionRepository;
         this.userRepository = userRepository;
         this.jobRoleRepository = jobRoleRepository;
         this.interviewRepository = interviewRepository;
+        this.interviewReportRepository = interviewReportRepository;
+        this.interviewService = interviewService;
     }
 
     @Transactional
@@ -57,10 +67,10 @@ public class AssessmentSessionService {
         session.setCurrentStage("RESUME_EVALUATION");
         session.setSessionStatus("IN_PROGRESS");
 
-        // Stage 1 (Resume) is accessible first
-        session.setResumeStageStatus("NOT_STARTED");
+        // Round 1 (Resume) is accessible initially
+        session.setResumeStageStatus("AVAILABLE");
 
-        // Stages 2 & 3 are strictly locked initially
+        // Rounds 2 & 3 are strictly locked initially
         session.setMcqStageStatus("LOCKED");
         session.setVideoStageStatus("LOCKED");
 
@@ -96,7 +106,7 @@ public class AssessmentSessionService {
 
     /**
      * Strictly verifies sequential round access gates.
-     * Prevents skipping or jumping directly to locked rounds.
+     * Prevents skipping or jumping directly to locked rounds via URL or API.
      */
     public void validateStageAccess(AssessmentSession session, String targetStage) {
         String stage = targetStage != null ? targetStage.toUpperCase().trim() : "";
@@ -108,33 +118,51 @@ public class AssessmentSessionService {
 
             case "MCQ_ASSESSMENT":
                 if (!"COMPLETED".equalsIgnoreCase(session.getResumeStageStatus()) || session.getResumeScore() == null) {
-                    throw new BadRequestException("MCQ Assessment is locked. You must complete and save the Resume Evaluation round first.");
+                    throw new BadRequestException("Complete Resume Evaluation to unlock this round.");
                 }
                 break;
 
             case "VIDEO_INTERVIEW":
+                if (!"COMPLETED".equalsIgnoreCase(session.getResumeStageStatus()) || session.getResumeScore() == null) {
+                    throw new BadRequestException("Complete Resume Evaluation to unlock this round.");
+                }
                 if (!"COMPLETED".equalsIgnoreCase(session.getMcqStageStatus()) || session.getMcqScore() == null) {
-                    throw new BadRequestException("AI Video Interview is locked. You must complete and save the MCQ Assessment round first.");
+                    throw new BadRequestException("Complete MCQ Assessment to unlock this round.");
                 }
                 break;
 
             case "FINAL_REPORT":
             case "COMPLETED":
-                boolean allCompleted = "COMPLETED".equalsIgnoreCase(session.getResumeStageStatus())
-                        && "COMPLETED".equalsIgnoreCase(session.getMcqStageStatus())
-                        && "COMPLETED".equalsIgnoreCase(session.getVideoStageStatus())
-                        && session.getResumeScore() != null
-                        && session.getMcqScore() != null
-                        && session.getVideoScore() != null;
-
-                if (!allCompleted) {
-                    throw new BadRequestException("Final Combined Report is locked until all three assessment rounds (Resume, MCQ, and Video) are completed.");
+                if (!"COMPLETED".equalsIgnoreCase(session.getResumeStageStatus()) || session.getResumeScore() == null) {
+                    throw new BadRequestException("Complete Resume Evaluation to unlock this round.");
+                }
+                if (!"COMPLETED".equalsIgnoreCase(session.getMcqStageStatus()) || session.getMcqScore() == null) {
+                    throw new BadRequestException("Complete MCQ Assessment to unlock this round.");
+                }
+                if (!"COMPLETED".equalsIgnoreCase(session.getVideoStageStatus()) || session.getVideoScore() == null) {
+                    throw new BadRequestException("Complete all three assessment rounds to unlock the final report.");
                 }
                 break;
 
             default:
                 throw new BadRequestException("Unknown assessment stage: " + targetStage);
         }
+    }
+
+    /**
+     * Start/Resume Round 1 (Resume Evaluation)
+     */
+    @Transactional
+    public AssessmentSessionResponse startResumeRound(Long sessionId, Long userId) {
+        AssessmentSession session = getSessionEntity(sessionId, userId);
+
+        if (!"COMPLETED".equalsIgnoreCase(session.getResumeStageStatus())) {
+            session.setResumeStageStatus("IN_PROGRESS");
+            session.setCurrentStage("RESUME_EVALUATION");
+            session = assessmentSessionRepository.save(session);
+        }
+
+        return mapToResponse(session);
     }
 
     /**
@@ -151,12 +179,7 @@ public class AssessmentSessionService {
             String feedback,
             String filename
     ) {
-        AssessmentSession session = assessmentSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Assessment session not found with ID: " + sessionId));
-
-        if (!session.getUser().getId().equals(userId)) {
-            throw new UnauthorizedAccessException("Unauthorized access to assessment session.");
-        }
+        AssessmentSession session = getSessionEntity(sessionId, userId);
 
         if (score == null || score < 0.0 || score > 100.0) {
             throw new BadRequestException("Resume score must be between 0 and 100.");
@@ -172,12 +195,53 @@ public class AssessmentSessionService {
 
         // Unlock Stage 2: MCQ Round
         session.setCurrentStage("MCQ_ASSESSMENT");
-        if ("LOCKED".equalsIgnoreCase(session.getMcqStageStatus())) {
-            session.setMcqStageStatus("NOT_STARTED");
+        if ("LOCKED".equalsIgnoreCase(session.getMcqStageStatus()) || "NOT_STARTED".equalsIgnoreCase(session.getMcqStageStatus())) {
+            session.setMcqStageStatus("AVAILABLE");
         }
 
         AssessmentSession updated = assessmentSessionRepository.save(session);
         return mapToResponse(updated);
+    }
+
+    /**
+     * Start/Resume Round 2 (MCQ Assessment)
+     * Strictly gated: Rejects if Resume round is not completed.
+     */
+    @Transactional
+    public InterviewResponse startOrResumeMcqRound(Long sessionId, Long userId) {
+        AssessmentSession session = getSessionEntity(sessionId, userId);
+
+        // Enforce prerequisite check
+        validateStageAccess(session, "MCQ_ASSESSMENT");
+
+        Interview mcqInterview = session.getMcqInterview();
+        if (mcqInterview == null) {
+            // Initialize 20-question MCQ interview session
+            CreateInterviewRequest req = new CreateInterviewRequest();
+            req.setJobRoleId(session.getJobRole().getId());
+            req.setDifficulty(session.getDifficulty());
+            req.setMode("MCQ");
+            req.setQuestionCount(20);
+
+            InterviewResponse interviewResp = interviewService.createInterview(userId, req);
+            mcqInterview = interviewRepository.findById(interviewResp.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Created MCQ Interview not found."));
+
+            session.setMcqInterview(mcqInterview);
+            session.setMcqStageStatus("IN_PROGRESS");
+            session.setCurrentStage("MCQ_ASSESSMENT");
+            assessmentSessionRepository.save(session);
+
+            return interviewResp;
+        } else {
+            // Resume existing MCQ interview
+            if (!"COMPLETED".equalsIgnoreCase(session.getMcqStageStatus())) {
+                session.setMcqStageStatus("IN_PROGRESS");
+                session.setCurrentStage("MCQ_ASSESSMENT");
+                assessmentSessionRepository.save(session);
+            }
+            return interviewService.getInterviewById(mcqInterview.getId(), userId);
+        }
     }
 
     /**
@@ -191,35 +255,64 @@ public class AssessmentSessionService {
             Long mcqInterviewId,
             Double score
     ) {
-        AssessmentSession session = assessmentSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Assessment session not found with ID: " + sessionId));
-
-        if (!session.getUser().getId().equals(userId)) {
-            throw new UnauthorizedAccessException("Unauthorized access to assessment session.");
-        }
+        AssessmentSession session = getSessionEntity(sessionId, userId);
 
         // Validate prerequisite
         validateStageAccess(session, "MCQ_ASSESSMENT");
 
+        Interview interview = null;
         if (mcqInterviewId != null) {
-            Interview interview = interviewRepository.findById(mcqInterviewId)
+            interview = interviewRepository.findById(mcqInterviewId)
                     .orElseThrow(() -> new ResourceNotFoundException("MCQ Interview not found with ID: " + mcqInterviewId));
             session.setMcqInterview(interview);
+        } else if (session.getMcqInterview() != null) {
+            interview = session.getMcqInterview();
         }
 
-        double finalMcqScore = score != null ? Math.round(score * 10.0) / 10.0 : 0.0;
+        Double finalMcqScore = score;
+        if (finalMcqScore == null && interview != null) {
+            finalMcqScore = interviewReportRepository.findByInterviewId(interview.getId())
+                    .map(InterviewReport::getOverallScore)
+                    .orElse(null);
+        }
+
+        if (finalMcqScore == null) {
+            throw new BadRequestException("MCQ assessment score is required to complete this round.");
+        }
+
+        finalMcqScore = Math.round(finalMcqScore * 10.0) / 10.0;
         session.setMcqScore(finalMcqScore);
         session.setMcqStageStatus("COMPLETED");
         session.setMcqCompletedAt(LocalDateTime.now());
 
         // Unlock Stage 3: AI Video Interview
         session.setCurrentStage("VIDEO_INTERVIEW");
-        if ("LOCKED".equalsIgnoreCase(session.getVideoStageStatus())) {
-            session.setVideoStageStatus("NOT_STARTED");
+        if ("LOCKED".equalsIgnoreCase(session.getVideoStageStatus()) || "NOT_STARTED".equalsIgnoreCase(session.getVideoStageStatus())) {
+            session.setVideoStageStatus("AVAILABLE");
         }
 
         AssessmentSession updated = assessmentSessionRepository.save(session);
         return mapToResponse(updated);
+    }
+
+    /**
+     * Start/Resume Round 3 (AI Video Interview)
+     * Strictly gated: Rejects if MCQ round is not completed.
+     */
+    @Transactional
+    public AssessmentSessionResponse startOrResumeVideoRound(Long sessionId, Long userId) {
+        AssessmentSession session = getSessionEntity(sessionId, userId);
+
+        // Enforce prerequisite check
+        validateStageAccess(session, "VIDEO_INTERVIEW");
+
+        if (!"COMPLETED".equalsIgnoreCase(session.getVideoStageStatus())) {
+            session.setVideoStageStatus("IN_PROGRESS");
+            session.setCurrentStage("VIDEO_INTERVIEW");
+            session = assessmentSessionRepository.save(session);
+        }
+
+        return mapToResponse(session);
     }
 
     /**
@@ -236,12 +329,7 @@ public class AssessmentSessionService {
             String sentimentLabel,
             String feedback
     ) {
-        AssessmentSession session = assessmentSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Assessment session not found with ID: " + sessionId));
-
-        if (!session.getUser().getId().equals(userId)) {
-            throw new UnauthorizedAccessException("Unauthorized access to assessment session.");
-        }
+        AssessmentSession session = getSessionEntity(sessionId, userId);
 
         // Validate prerequisite
         validateStageAccess(session, "VIDEO_INTERVIEW");
@@ -255,8 +343,7 @@ public class AssessmentSessionService {
         session.setVideoStageStatus("COMPLETED");
         session.setVideoCompletedAt(LocalDateTime.now());
 
-        // Calculate Final Combined Composite Score:
-        // Weighting: 25% Resume Evaluation + 40% MCQ Knowledge Round + 35% AI Video Technical Interview
+        // Composite scoring formula: 25% Resume + 40% MCQ + 35% AI Video
         double resume = session.getResumeScore() != null ? session.getResumeScore() : 0.0;
         double mcq = session.getMcqScore() != null ? session.getMcqScore() : 0.0;
         double video = finalVideoScore;
@@ -266,7 +353,7 @@ public class AssessmentSessionService {
 
         session.setFinalCompositeScore(roundedComposite);
         session.setFinalSummary(String.format(
-                "Assessment successfully completed for role '%s' at %s level. Final Composite Score: %.1f%% (Resume: %.1f%%, MCQ Assessment: %.1f%%, AI Video Interview: %.1f%%).",
+                "Full assessment completed for role '%s' at %s level. Final Composite Score: %.1f%% (Resume: %.1f%%, MCQ: %.1f%%, Video Interview: %.1f%%).",
                 session.getJobRole().getName(),
                 session.getDifficulty(),
                 roundedComposite,
@@ -283,6 +370,17 @@ public class AssessmentSessionService {
         return mapToResponse(updated);
     }
 
+    private AssessmentSession getSessionEntity(Long sessionId, Long userId) {
+        AssessmentSession session = assessmentSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment session not found with ID: " + sessionId));
+
+        if (!session.getUser().getId().equals(userId)) {
+            throw new UnauthorizedAccessException("You are not authorized to access this assessment session.");
+        }
+
+        return session;
+    }
+
     public AssessmentSessionResponse mapToResponse(AssessmentSession session) {
         AssessmentSessionResponse resp = new AssessmentSessionResponse();
         resp.setId(session.getId());
@@ -293,47 +391,111 @@ public class AssessmentSessionService {
         resp.setCurrentStage(session.getCurrentStage());
         resp.setSessionStatus(session.getSessionStatus());
 
-        // Stage 1
-        resp.setResumeStageStatus(session.getResumeStageStatus());
-        resp.setResumeScore(session.getResumeScore());
-        resp.setResumeFilename(session.getResumeFilename());
-        resp.setResumeSkillsMatchScore(session.getResumeSkillsMatchScore());
-        resp.setResumeExperienceScore(session.getResumeExperienceScore());
-        resp.setResumeFeedback(session.getResumeFeedback());
-        resp.setResumeCompletedAt(session.getResumeCompletedAt());
-        resp.setResumeUnlocked(true); // Stage 1 is always unlocked
+        // Lock determination
+        boolean isResumeCompleted = "COMPLETED".equalsIgnoreCase(session.getResumeStageStatus()) && session.getResumeScore() != null;
+        boolean isMcqCompleted = isResumeCompleted && "COMPLETED".equalsIgnoreCase(session.getMcqStageStatus()) && session.getMcqScore() != null;
+        boolean isVideoCompleted = isMcqCompleted && "COMPLETED".equalsIgnoreCase(session.getVideoStageStatus()) && session.getVideoScore() != null;
 
-        // Stage 2
-        resp.setMcqStageStatus(session.getMcqStageStatus());
-        if (session.getMcqInterview() != null) {
-            resp.setMcqInterviewId(session.getMcqInterview().getId());
+        // Progress Text & Active Round
+        if (!isResumeCompleted) {
+            resp.setProgressText("Round 1 of 3: Resume Evaluation");
+            resp.setActiveRoundNumber(1);
+        } else if (!isMcqCompleted) {
+            resp.setProgressText("Round 2 of 3: MCQ Technical Assessment");
+            resp.setActiveRoundNumber(2);
+        } else if (!isVideoCompleted) {
+            resp.setProgressText("Round 3 of 3: AI Video Interview");
+            resp.setActiveRoundNumber(3);
+        } else {
+            resp.setProgressText("All 3 Rounds Completed");
+            resp.setActiveRoundNumber(4);
         }
-        resp.setMcqScore(session.getMcqScore());
-        resp.setMcqCompletedAt(session.getMcqCompletedAt());
-        boolean isMcqUnlocked = "COMPLETED".equalsIgnoreCase(session.getResumeStageStatus()) && session.getResumeScore() != null;
-        resp.setMcqUnlocked(isMcqUnlocked);
 
-        // Stage 3
-        resp.setVideoStageStatus(session.getVideoStageStatus());
-        resp.setVideoScore(session.getVideoScore());
-        resp.setVideoTechnicalScore(session.getVideoTechnicalScore());
-        resp.setVideoCommunicationScore(session.getVideoCommunicationScore());
-        resp.setVideoSentimentLabel(session.getVideoSentimentLabel());
-        resp.setVideoFeedback(session.getVideoFeedback());
-        resp.setVideoCompletedAt(session.getVideoCompletedAt());
-        boolean isVideoUnlocked = isMcqUnlocked && "COMPLETED".equalsIgnoreCase(session.getMcqStageStatus()) && session.getMcqScore() != null;
-        resp.setVideoUnlocked(isVideoUnlocked);
+        // --- Round 1: Resume Evaluation ---
+        String resumeStatus = normalizeStatus(session.getResumeStageStatus(), true);
+        String resumeAction = isResumeCompleted ? "View Evaluation" : "IN_PROGRESS".equalsIgnoreCase(resumeStatus) ? "Continue Resume Evaluation" : "Start Resume Evaluation";
+        AssessmentSessionResponse.RoundDetailDto resumeDto = new AssessmentSessionResponse.RoundDetailDto(
+                "RESUME_EVALUATION",
+                "Resume Evaluation",
+                1,
+                resumeStatus,
+                true,
+                null,
+                session.getResumeScore(),
+                session.getResumeFeedback(),
+                session.getResumeCompletedAt(),
+                resumeAction,
+                "/assessment/" + session.getId() + "/resume"
+        );
+        resp.setResumeRound(resumeDto);
 
-        // Final Report
+        // --- Round 2: MCQ Technical Assessment ---
+        boolean isMcqUnlocked = isResumeCompleted;
+        String mcqStatus = isMcqUnlocked ? normalizeStatus(session.getMcqStageStatus(), true) : "LOCKED";
+        String mcqLockMsg = isMcqUnlocked ? null : "Complete Resume Evaluation to unlock this round.";
+        String mcqAction = isMcqCompleted ? "View MCQ Results" : "IN_PROGRESS".equalsIgnoreCase(mcqStatus) ? "Continue MCQ Assessment" : "Start MCQ Assessment";
+        AssessmentSessionResponse.RoundDetailDto mcqDto = new AssessmentSessionResponse.RoundDetailDto(
+                "MCQ_ASSESSMENT",
+                "MCQ Technical Assessment",
+                2,
+                mcqStatus,
+                isMcqUnlocked,
+                mcqLockMsg,
+                session.getMcqScore(),
+                null,
+                session.getMcqCompletedAt(),
+                mcqAction,
+                "/assessment/" + session.getId() + "/mcq"
+        );
+        resp.setMcqRound(mcqDto);
+
+        // --- Round 3: AI Video Interview ---
+        boolean isVideoUnlocked = isMcqCompleted;
+        String videoStatus = isVideoUnlocked ? normalizeStatus(session.getVideoStageStatus(), true) : "LOCKED";
+        String videoLockMsg = isVideoUnlocked ? null : "Complete MCQ Assessment to unlock this round.";
+        String videoAction = isVideoCompleted ? "View Video Analytics" : "IN_PROGRESS".equalsIgnoreCase(videoStatus) ? "Continue Video Interview" : "Start Video Interview";
+        AssessmentSessionResponse.RoundDetailDto videoDto = new AssessmentSessionResponse.RoundDetailDto(
+                "VIDEO_INTERVIEW",
+                "AI Video Interview",
+                3,
+                videoStatus,
+                isVideoUnlocked,
+                videoLockMsg,
+                session.getVideoScore(),
+                session.getVideoFeedback(),
+                session.getVideoCompletedAt(),
+                videoAction,
+                "/assessment/" + session.getId() + "/video"
+        );
+        resp.setVideoRound(videoDto);
+
+        // --- Final Combined Report ---
+        boolean isFinalReportUnlocked = isVideoCompleted;
+        resp.setFinalReportUnlocked(isFinalReportUnlocked);
+        resp.setFinalReportLockMessage(isFinalReportUnlocked ? null : "Complete all three assessment rounds to unlock the final report.");
         resp.setFinalCompositeScore(session.getFinalCompositeScore());
         resp.setFinalSummary(session.getFinalSummary());
-        boolean isFinalReportUnlocked = isVideoUnlocked && "COMPLETED".equalsIgnoreCase(session.getVideoStageStatus()) && session.getVideoScore() != null;
-        resp.setFinalReportUnlocked(isFinalReportUnlocked);
 
         resp.setCreatedAt(session.getCreatedAt());
         resp.setUpdatedAt(session.getUpdatedAt());
         resp.setCompletedAt(session.getCompletedAt());
 
         return resp;
+    }
+
+    private String normalizeStatus(String rawStatus, boolean isUnlocked) {
+        if (!isUnlocked || "LOCKED".equalsIgnoreCase(rawStatus)) {
+            return "LOCKED";
+        }
+        if ("COMPLETED".equalsIgnoreCase(rawStatus)) {
+            return "COMPLETED";
+        }
+        if ("IN_PROGRESS".equalsIgnoreCase(rawStatus)) {
+            return "IN_PROGRESS";
+        }
+        if ("FAILED".equalsIgnoreCase(rawStatus)) {
+            return "FAILED";
+        }
+        return "AVAILABLE";
     }
 }

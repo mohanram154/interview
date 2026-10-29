@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
+import { assessmentApi } from '../api/assessmentApi';
+import { AssessmentSession } from '../types/assessment';
 import { DashboardStats, JobRole } from '../types/interview';
 import { ApiResponse } from '../types/auth';
 import { 
@@ -32,6 +34,7 @@ export const DashboardPage: React.FC = () => {
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
+  const [activeSession, setActiveSession] = useState<AssessmentSession | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,9 +42,10 @@ export const DashboardPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [statsRes, rolesRes] = await Promise.all([
+      const [statsRes, rolesRes, activeSess] = await Promise.all([
         apiClient.get<ApiResponse<DashboardStats>>('/interviews/dashboard'),
-        apiClient.get<ApiResponse<JobRole[]>>('/job-roles')
+        apiClient.get<ApiResponse<JobRole[]>>('/job-roles'),
+        assessmentApi.getActiveSession()
       ]);
 
       if (statsRes.data.success) {
@@ -50,6 +54,7 @@ export const DashboardPage: React.FC = () => {
       if (rolesRes.data.success) {
         setJobRoles(rolesRes.data.data);
       }
+      setActiveSession(activeSess);
     } catch (err: any) {
       console.error('Error loading dashboard data:', err);
       setError(err.response?.data?.message || 'Failed to load dashboard data.');
@@ -125,6 +130,41 @@ export const DashboardPage: React.FC = () => {
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </Link>
       </div>
+
+      {/* Active Assessment In-Progress Alert Banner */}
+      {activeSession && activeSession.sessionStatus === 'IN_PROGRESS' && (
+        <div className="p-6 rounded-2xl bg-violet-50 border-2 border-violet-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-violet-700 bg-violet-100 px-2.5 py-0.5 rounded-full">
+                  Sequential Assessment Active
+                </span>
+                <span className="text-xs font-semibold text-gray-500">
+                  {activeSession.difficulty} Tier
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mt-1">
+                {activeSession.jobRoleName} Competency Assessment
+              </h3>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Current Status: <strong className="text-violet-700">{activeSession.progressText || 'Round In Progress'}</strong>. Your progress is saved.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to={`/assessment/${activeSession.id}`}
+            className="w-full md:w-auto px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm shadow-xs transition-colors inline-flex items-center justify-center gap-2 shrink-0"
+          >
+            <span>Continue Assessment</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">

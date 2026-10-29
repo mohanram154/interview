@@ -14,6 +14,11 @@ import { InterviewSetupPage } from './pages/InterviewSetupPage';
 import { InterviewRoomPage } from './pages/InterviewRoomPage';
 import { ReportPage } from './pages/ReportPage';
 import { HistoryPage } from './pages/HistoryPage';
+import { AssessmentHubPage } from './pages/AssessmentHubPage';
+import { ResumeRoundPage } from './pages/ResumeRoundPage';
+import { McqAssessmentPage } from './pages/McqAssessmentPage';
+import { VideoInterviewRoundPage } from './pages/VideoInterviewRoundPage';
+import { FinalReportPage } from './pages/FinalReportPage';
 
 export const App: React.FC = () => {
   return (
@@ -74,6 +79,48 @@ export const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <HistoryPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Strict Sequential 3-Stage Assessment Routes */}
+              <Route
+                path="/assessment/:id"
+                element={
+                  <ProtectedRoute>
+                    <AssessmentHubPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/assessment/:id/resume"
+                element={
+                  <ProtectedRoute>
+                    <ResumeRoundPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/assessment/:id/mcq"
+                element={
+                  <ProtectedRoute>
+                    <McqAssessmentPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/assessment/:id/video"
+                element={
+                  <ProtectedRoute>
+                    <VideoInterviewRoundPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/assessment/:id/report"
+                element={
+                  <ProtectedRoute>
+                    <FinalReportPage />
                   </ProtectedRoute>
                 }
               />

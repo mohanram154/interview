@@ -13,3 +13,4 @@ public interface AssessmentSessionRepository extends JpaRepository<AssessmentSes
     Optional<AssessmentSession> findByIdAndUserId(Long id, Long userId);
     Optional<AssessmentSession> findFirstByUserIdAndSessionStatusOrderByCreatedAtDesc(Long userId, String sessionStatus);
 }
+

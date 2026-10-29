@@ -12,41 +12,87 @@ public class AssessmentSessionResponse {
     private String currentStage;
     private String sessionStatus;
 
-    // Stage 1: Resume
-    private String resumeStageStatus;
-    private Double resumeScore;
-    private String resumeFilename;
-    private Double resumeSkillsMatchScore;
-    private Double resumeExperienceScore;
-    private String resumeFeedback;
-    private LocalDateTime resumeCompletedAt;
-    private boolean resumeUnlocked;
+    // Sequential Progress
+    private String progressText; // e.g. "Round 1 of 3", "Round 2 of 3", "Round 3 of 3"
+    private int activeRoundNumber; // 1, 2, 3
 
-    // Stage 2: MCQ
-    private String mcqStageStatus;
-    private Long mcqInterviewId;
-    private Double mcqScore;
-    private LocalDateTime mcqCompletedAt;
-    private boolean mcqUnlocked;
-
-    // Stage 3: Video
-    private String videoStageStatus;
-    private Double videoScore;
-    private Double videoTechnicalScore;
-    private Double videoCommunicationScore;
-    private String videoSentimentLabel;
-    private String videoFeedback;
-    private LocalDateTime videoCompletedAt;
-    private boolean videoUnlocked;
+    // Detailed Round States
+    private RoundDetailDto resumeRound;
+    private RoundDetailDto mcqRound;
+    private RoundDetailDto videoRound;
 
     // Final Outcome
     private Double finalCompositeScore;
     private String finalSummary;
     private boolean finalReportUnlocked;
+    private String finalReportLockMessage;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
+
+    public static class RoundDetailDto {
+        private String id; // "RESUME_EVALUATION", "MCQ_ASSESSMENT", "VIDEO_INTERVIEW"
+        private String name; // "Resume Evaluation", "MCQ Technical Assessment", "AI Video Interview"
+        private int roundNumber; // 1, 2, 3
+        private String status; // "LOCKED", "AVAILABLE", "IN_PROGRESS", "COMPLETED", "FAILED"
+        private boolean unlocked;
+        private String lockMessage;
+        private Double score;
+        private String feedback;
+        private LocalDateTime completedAt;
+        private String actionLabel;
+        private String actionRoute;
+
+        public RoundDetailDto() {}
+
+        public RoundDetailDto(String id, String name, int roundNumber, String status, boolean unlocked, String lockMessage, Double score, String feedback, LocalDateTime completedAt, String actionLabel, String actionRoute) {
+            this.id = id;
+            this.name = name;
+            this.roundNumber = roundNumber;
+            this.status = status;
+            this.unlocked = unlocked;
+            this.lockMessage = lockMessage;
+            this.score = score;
+            this.feedback = feedback;
+            this.completedAt = completedAt;
+            this.actionLabel = actionLabel;
+            this.actionRoute = actionRoute;
+        }
+
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+
+        public int getRoundNumber() { return roundNumber; }
+        public void setRoundNumber(int roundNumber) { this.roundNumber = roundNumber; }
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+
+        public boolean isUnlocked() { return unlocked; }
+        public void setUnlocked(boolean unlocked) { this.unlocked = unlocked; }
+
+        public String getLockMessage() { return lockMessage; }
+        public void setLockMessage(String lockMessage) { this.lockMessage = lockMessage; }
+
+        public Double getScore() { return score; }
+        public void setScore(Double score) { this.score = score; }
+
+        public String getFeedback() { return feedback; }
+        public void setFeedback(String feedback) { this.feedback = feedback; }
+
+        public LocalDateTime getCompletedAt() { return completedAt; }
+        public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+
+        public String getActionLabel() { return actionLabel; }
+        public void setActionLabel(String actionLabel) { this.actionLabel = actionLabel; }
+
+        public String getActionRoute() { return actionRoute; }
+        public void setActionRoute(String actionRoute) { this.actionRoute = actionRoute; }
+    }
 
     public AssessmentSessionResponse() {}
 
@@ -71,68 +117,20 @@ public class AssessmentSessionResponse {
     public String getSessionStatus() { return sessionStatus; }
     public void setSessionStatus(String sessionStatus) { this.sessionStatus = sessionStatus; }
 
-    public String getResumeStageStatus() { return resumeStageStatus; }
-    public void setResumeStageStatus(String resumeStageStatus) { this.resumeStageStatus = resumeStageStatus; }
+    public String getProgressText() { return progressText; }
+    public void setProgressText(String progressText) { this.progressText = progressText; }
 
-    public Double getResumeScore() { return resumeScore; }
-    public void setResumeScore(Double resumeScore) { this.resumeScore = resumeScore; }
+    public int getActiveRoundNumber() { return activeRoundNumber; }
+    public void setActiveRoundNumber(int activeRoundNumber) { this.activeRoundNumber = activeRoundNumber; }
 
-    public String getResumeFilename() { return resumeFilename; }
-    public void setResumeFilename(String resumeFilename) { this.resumeFilename = resumeFilename; }
+    public RoundDetailDto getResumeRound() { return resumeRound; }
+    public void setResumeRound(RoundDetailDto resumeRound) { this.resumeRound = resumeRound; }
 
-    public Double getResumeSkillsMatchScore() { return resumeSkillsMatchScore; }
-    public void setResumeSkillsMatchScore(Double resumeSkillsMatchScore) { this.resumeSkillsMatchScore = resumeSkillsMatchScore; }
+    public RoundDetailDto getMcqRound() { return mcqRound; }
+    public void setMcqRound(RoundDetailDto mcqRound) { this.mcqRound = mcqRound; }
 
-    public Double getResumeExperienceScore() { return resumeExperienceScore; }
-    public void setResumeExperienceScore(Double resumeExperienceScore) { this.resumeExperienceScore = resumeExperienceScore; }
-
-    public String getResumeFeedback() { return resumeFeedback; }
-    public void setResumeFeedback(String resumeFeedback) { this.resumeFeedback = resumeFeedback; }
-
-    public LocalDateTime getResumeCompletedAt() { return resumeCompletedAt; }
-    public void setResumeCompletedAt(LocalDateTime resumeCompletedAt) { this.resumeCompletedAt = resumeCompletedAt; }
-
-    public boolean isResumeUnlocked() { return resumeUnlocked; }
-    public void setResumeUnlocked(boolean resumeUnlocked) { this.resumeUnlocked = resumeUnlocked; }
-
-    public String getMcqStageStatus() { return mcqStageStatus; }
-    public void setMcqStageStatus(String mcqStageStatus) { this.mcqStageStatus = mcqStageStatus; }
-
-    public Long getMcqInterviewId() { return mcqInterviewId; }
-    public void setMcqInterviewId(Long mcqInterviewId) { this.mcqInterviewId = mcqInterviewId; }
-
-    public Double getMcqScore() { return mcqScore; }
-    public void setMcqScore(Double mcqScore) { this.mcqScore = mcqScore; }
-
-    public LocalDateTime getMcqCompletedAt() { return mcqCompletedAt; }
-    public void setMcqCompletedAt(LocalDateTime mcqCompletedAt) { this.mcqCompletedAt = mcqCompletedAt; }
-
-    public boolean isMcqUnlocked() { return mcqUnlocked; }
-    public void setMcqUnlocked(boolean mcqUnlocked) { this.mcqUnlocked = mcqUnlocked; }
-
-    public String getVideoStageStatus() { return videoStageStatus; }
-    public void setVideoStageStatus(String videoStageStatus) { this.videoStageStatus = videoStageStatus; }
-
-    public Double getVideoScore() { return videoScore; }
-    public void setVideoScore(Double videoScore) { this.videoScore = videoScore; }
-
-    public Double getVideoTechnicalScore() { return videoTechnicalScore; }
-    public void setVideoTechnicalScore(Double videoTechnicalScore) { this.videoTechnicalScore = videoTechnicalScore; }
-
-    public Double getVideoCommunicationScore() { return videoCommunicationScore; }
-    public void setVideoCommunicationScore(Double videoCommunicationScore) { this.videoCommunicationScore = videoCommunicationScore; }
-
-    public String getVideoSentimentLabel() { return videoSentimentLabel; }
-    public void setVideoSentimentLabel(String videoSentimentLabel) { this.videoSentimentLabel = videoSentimentLabel; }
-
-    public String getVideoFeedback() { return videoFeedback; }
-    public void setVideoFeedback(String videoFeedback) { this.videoFeedback = videoFeedback; }
-
-    public LocalDateTime getVideoCompletedAt() { return videoCompletedAt; }
-    public void setVideoCompletedAt(LocalDateTime videoCompletedAt) { this.videoCompletedAt = videoCompletedAt; }
-
-    public boolean isVideoUnlocked() { return videoUnlocked; }
-    public void setVideoUnlocked(boolean videoUnlocked) { this.videoUnlocked = videoUnlocked; }
+    public RoundDetailDto getVideoRound() { return videoRound; }
+    public void setVideoRound(RoundDetailDto videoRound) { this.videoRound = videoRound; }
 
     public Double getFinalCompositeScore() { return finalCompositeScore; }
     public void setFinalCompositeScore(Double finalCompositeScore) { this.finalCompositeScore = finalCompositeScore; }
@@ -143,6 +141,9 @@ public class AssessmentSessionResponse {
     public boolean isFinalReportUnlocked() { return finalReportUnlocked; }
     public void setFinalReportUnlocked(boolean finalReportUnlocked) { this.finalReportUnlocked = finalReportUnlocked; }
 
+    public String getFinalReportLockMessage() { return finalReportLockMessage; }
+    public void setFinalReportLockMessage(String finalReportLockMessage) { this.finalReportLockMessage = finalReportLockMessage; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
@@ -151,4 +152,17 @@ public class AssessmentSessionResponse {
 
     public LocalDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+
+    // Backward compatibility helper getters
+    public String getResumeStageStatus() { return resumeRound != null ? resumeRound.getStatus() : "AVAILABLE"; }
+    public Double getResumeScore() { return resumeRound != null ? resumeRound.getScore() : null; }
+    public boolean isResumeUnlocked() { return resumeRound != null && resumeRound.isUnlocked(); }
+
+    public String getMcqStageStatus() { return mcqRound != null ? mcqRound.getStatus() : "LOCKED"; }
+    public Double getMcqScore() { return mcqRound != null ? mcqRound.getScore() : null; }
+    public boolean isMcqUnlocked() { return mcqRound != null && mcqRound.isUnlocked(); }
+
+    public String getVideoStageStatus() { return videoRound != null ? videoRound.getStatus() : "LOCKED"; }
+    public Double getVideoScore() { return videoRound != null ? videoRound.getScore() : null; }
+    public boolean isVideoUnlocked() { return videoRound != null && videoRound.isUnlocked(); }
 }

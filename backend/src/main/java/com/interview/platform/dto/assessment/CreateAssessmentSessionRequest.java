@@ -22,3 +22,4 @@ public class CreateAssessmentSessionRequest {
     public String getDifficulty() { return difficulty; }
     public void setDifficulty(String difficulty) { this.difficulty = difficulty; }
 }
+

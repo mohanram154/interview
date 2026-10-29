@@ -48,3 +48,4 @@ CREATE TABLE IF NOT EXISTS assessment_sessions (
     INDEX idx_assessment_sessions_user (user_id, session_status),
     INDEX idx_assessment_sessions_stage (current_stage, session_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

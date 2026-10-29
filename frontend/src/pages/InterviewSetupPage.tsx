@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { assessmentApi } from '../api/assessmentApi';
 import { JobRole, CreateInterviewPayload, Interview } from '../types/interview';
 import { ApiResponse } from '../types/auth';
 import { 
@@ -11,7 +12,9 @@ import {
   Loader2, 
   AlertCircle,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  ShieldCheck,
+  ArrowRight
 } from 'lucide-react';
 
 export const InterviewSetupPage: React.FC = () => {
@@ -26,7 +29,31 @@ export const InterviewSetupPage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [startingAssessment, setStartingAssessment] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleStartAssessmentPipeline = async () => {
+    if (!selectedRoleId) {
+      setError('Please select a technical domain / role.');
+      return;
+    }
+
+    setStartingAssessment(true);
+    setError(null);
+
+    try {
+      const res = await assessmentApi.createSession({
+        jobRoleId: selectedRoleId,
+        difficulty
+      });
+      navigate(`/assessment/${res.id}`);
+    } catch (err: any) {
+      console.error('Failed to create assessment session:', err);
+      setError(err.response?.data?.message || 'Failed to initialize assessment session.');
+    } finally {
+      setStartingAssessment(false);
+    }
+  };
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -343,31 +370,64 @@ export const InterviewSetupPage: React.FC = () => {
       </div>
 
       {/* Summary Box & Action */}
-      <div className="p-6 rounded-2xl bg-violet-50/70 border border-violet-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="p-6 sm:p-8 rounded-3xl bg-violet-50/70 border border-violet-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
-          <div className="text-xs text-gray-500 font-medium">Ready to begin:</div>
-          <div className="text-sm font-bold text-gray-900 mt-0.5">
-            {selectedRole?.name} • {difficulty} Level • {mode} Round ({questionCount} Questions)
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">
+              Assessment Pipeline
+            </span>
+            <span className="text-xs font-semibold text-gray-500">
+              Strict Sequential Evaluation
+            </span>
+          </div>
+          <div className="text-base font-bold text-gray-900 mt-1">
+            {selectedRole?.name} • {difficulty} Level
+          </div>
+          <div className="text-xs text-gray-600 mt-0.5">
+            Round 1: Resume Evaluation → Round 2: 20-Question MCQ → Round 3: AI Video Interview → Final Report
           </div>
         </div>
 
-        <button
-          onClick={handleStartInterview}
-          disabled={starting}
-          className="w-full sm:w-auto px-7 py-3 rounded-xl font-semibold text-sm text-white bg-violet-600 hover:bg-violet-700 shadow-sm shadow-violet-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
-        >
-          {starting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Generating Session...</span>
-            </>
-          ) : (
-            <>
-              <PlayCircle className="w-4 h-4" />
-              <span>Launch Mock Interview</span>
-            </>
-          )}
-        </button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          <button
+            type="button"
+            onClick={handleStartInterview}
+            disabled={starting || startingAssessment}
+            className="px-5 py-3 rounded-2xl font-semibold text-xs text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+          >
+            {starting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Launching Practice...</span>
+              </>
+            ) : (
+              <>
+                <PlayCircle className="w-4 h-4 text-gray-500" />
+                <span>Practice Single Round</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleStartAssessmentPipeline}
+            disabled={starting || startingAssessment}
+            className="px-7 py-3 rounded-2xl font-bold text-sm text-white bg-violet-600 hover:bg-violet-700 shadow-md shadow-violet-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+          >
+            {startingAssessment ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Initializing Pipeline...</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-4 h-4" />
+                <span>Start Sequential Assessment</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

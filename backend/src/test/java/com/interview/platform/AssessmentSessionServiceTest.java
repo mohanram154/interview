@@ -8,10 +8,12 @@ import com.interview.platform.entity.User;
 import com.interview.platform.exception.BadRequestException;
 import com.interview.platform.exception.UnauthorizedAccessException;
 import com.interview.platform.repository.AssessmentSessionRepository;
+import com.interview.platform.repository.InterviewReportRepository;
 import com.interview.platform.repository.InterviewRepository;
 import com.interview.platform.repository.JobRoleRepository;
 import com.interview.platform.repository.UserRepository;
 import com.interview.platform.service.AssessmentSessionService;
+import com.interview.platform.service.InterviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +33,8 @@ class AssessmentSessionServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private JobRoleRepository jobRoleRepository;
     @Mock private InterviewRepository interviewRepository;
+    @Mock private InterviewReportRepository interviewReportRepository;
+    @Mock private InterviewService interviewService;
 
     private AssessmentSessionService assessmentSessionService;
 
@@ -40,7 +44,9 @@ class AssessmentSessionServiceTest {
                 assessmentSessionRepository,
                 userRepository,
                 jobRoleRepository,
-                interviewRepository
+                interviewRepository,
+                interviewReportRepository,
+                interviewService
         );
     }
 
@@ -74,7 +80,7 @@ class AssessmentSessionServiceTest {
         assertNotNull(resp);
         assertEquals(100L, resp.getId());
         assertEquals("RESUME_EVALUATION", resp.getCurrentStage());
-        assertEquals("NOT_STARTED", resp.getResumeStageStatus());
+        assertEquals("AVAILABLE", resp.getResumeStageStatus());
         assertEquals("LOCKED", resp.getMcqStageStatus());
         assertEquals("LOCKED", resp.getVideoStageStatus());
 
@@ -95,7 +101,7 @@ class AssessmentSessionServiceTest {
         BadRequestException ex = assertThrows(BadRequestException.class, () ->
                 assessmentSessionService.validateStageAccess(session, "MCQ_ASSESSMENT")
         );
-        assertTrue(ex.getMessage().contains("MCQ Assessment is locked"));
+        assertTrue(ex.getMessage().contains("Complete Resume Evaluation to unlock this round."));
     }
 
     @Test
@@ -141,7 +147,7 @@ class AssessmentSessionServiceTest {
         BadRequestException ex = assertThrows(BadRequestException.class, () ->
                 assessmentSessionService.validateStageAccess(session, "VIDEO_INTERVIEW")
         );
-        assertTrue(ex.getMessage().contains("AI Video Interview is locked"));
+        assertTrue(ex.getMessage().contains("Complete MCQ Assessment to unlock this round."));
     }
 
     @Test
@@ -228,3 +234,4 @@ class AssessmentSessionServiceTest {
         );
     }
 }
+
