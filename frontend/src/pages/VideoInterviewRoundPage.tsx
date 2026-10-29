@@ -428,3 +428,4 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
     </div>
   );
 };
+

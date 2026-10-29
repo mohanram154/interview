@@ -66,3 +66,4 @@ public class CompleteVideoStageRequest {
         this.feedback = feedback;
     }
 }
+

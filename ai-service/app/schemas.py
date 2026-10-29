@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 class HealthResponse(BaseModel):
     status: str
@@ -44,3 +44,9 @@ class SentimentResponse(BaseModel):
         "It does not evaluate technical proficiency, integrity, confidence, or candidate job suitability."
     )
 
+class ResumeEvaluateRequest(BaseModel):
+    parsedResume: Dict[str, Any] = Field(..., description="Structured extracted or candidate-corrected resume data")
+    targetRole: str = Field("Software Developer", description="Target developer role benchmark")
+    companyName: Optional[str] = Field(None, description="Optional target company name")
+    jobDescription: Optional[str] = Field(None, description="Optional custom job description")
+    customWeights: Optional[Dict[str, float]] = Field(None, description="Configurable category weights")

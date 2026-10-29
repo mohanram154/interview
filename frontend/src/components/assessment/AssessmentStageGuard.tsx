@@ -187,3 +187,4 @@ export const AssessmentStageGuard: React.FC<AssessmentStageGuardProps> = ({
   // Round is unlocked: render child components
   return <>{children({ session, reloadSession: fetchSession })}</>;
 };
+

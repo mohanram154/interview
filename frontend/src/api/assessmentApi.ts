@@ -1,5 +1,10 @@
 import { apiClient } from './client';
-import { AssessmentSession, CreateAssessmentSessionPayload } from '../types/assessment';
+import { 
+  AssessmentSession, 
+  CreateAssessmentSessionPayload, 
+  ParsedResumeData, 
+  ResumeEvaluationResult 
+} from '../types/assessment';
 
 export const assessmentApi = {
   createSession: async (payload: CreateAssessmentSessionPayload): Promise<AssessmentSession> => {
@@ -28,6 +33,54 @@ export const assessmentApi = {
 
   validateStageAccess: async (sessionId: number | string, stage: string): Promise<boolean> => {
     const res = await apiClient.get<{ data: boolean }>(`/assessment-sessions/${sessionId}/validate-stage?stage=${encodeURIComponent(stage)}`);
+    return res.data.data;
+  },
+
+  // Upload and parse resume file (PDF or DOCX)
+  uploadAndParseResume: async (
+    sessionId: number | string,
+    file: File,
+    targetRole?: string
+  ): Promise<{ filename: string; fileType: string; fileSize: number; extractedData: ParsedResumeData }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (targetRole) {
+      formData.append('targetRole', targetRole);
+    }
+    const res = await apiClient.post<{ data: { filename: string; fileType: string; fileSize: number; extractedData: ParsedResumeData } }>(
+      `/assessment-sessions/${sessionId}/resume/upload`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000
+      }
+    );
+    return res.data.data;
+  },
+
+  // Submit candidate-reviewed/corrected resume data for final scoring and MCQ unlock
+  submitResumeEvaluation: async (
+    sessionId: number | string,
+    payload: {
+      targetRole: string;
+      companyName?: string;
+      jobDescription?: string;
+      correctedData: ParsedResumeData;
+      customWeights?: Record<string, number>;
+    }
+  ): Promise<ResumeEvaluationResult> => {
+    const res = await apiClient.post<{ data: ResumeEvaluationResult }>(
+      `/assessment-sessions/${sessionId}/resume/evaluate`,
+      payload
+    );
+    return res.data.data;
+  },
+
+  // Get persisted resume evaluation details
+  getResumeEvaluation: async (sessionId: number | string): Promise<ResumeEvaluationResult> => {
+    const res = await apiClient.get<{ data: ResumeEvaluationResult }>(
+      `/assessment-sessions/${sessionId}/resume`
+    );
     return res.data.data;
   },
 
