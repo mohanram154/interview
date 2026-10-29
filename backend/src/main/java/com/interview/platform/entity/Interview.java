@@ -81,3 +81,4 @@ public class Interview {
     public List<InterviewQuestion> getQuestions() { return questions; }
     public void setQuestions(List<InterviewQuestion> questions) { this.questions = questions; }
 }
+

@@ -80,3 +80,4 @@ class CandidateProfileTest {
         assertEquals("Backend Developer", updated.getPreferredRole());
     }
 }
+

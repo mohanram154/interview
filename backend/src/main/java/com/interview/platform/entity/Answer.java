@@ -15,8 +15,14 @@ public class Answer {
     @JoinColumn(name = "interview_question_id", nullable = false, unique = true)
     private InterviewQuestion interviewQuestion;
 
-    @Column(name = "answer_text", nullable = false, columnDefinition = "MEDIUMTEXT")
+    @Column(name = "answer_text", columnDefinition = "MEDIUMTEXT")
     private String answerText;
+
+    @Column(name = "selected_option", length = 10)
+    private String selectedOption; // A, B, C, D
+
+    @Column(name = "is_correct")
+    private Boolean isCorrect;
 
     @Column(name = "submitted_at", nullable = false, updatable = false)
     private LocalDateTime submittedAt = LocalDateTime.now();
@@ -44,6 +50,12 @@ public class Answer {
 
     public String getAnswerText() { return answerText; }
     public void setAnswerText(String answerText) { this.answerText = answerText; }
+
+    public String getSelectedOption() { return selectedOption; }
+    public void setSelectedOption(String selectedOption) { this.selectedOption = selectedOption; }
+
+    public Boolean getIsCorrect() { return isCorrect; }
+    public void setIsCorrect(Boolean isCorrect) { this.isCorrect = isCorrect; }
 
     public LocalDateTime getSubmittedAt() { return submittedAt; }
     public void setSubmittedAt(LocalDateTime submittedAt) { this.submittedAt = submittedAt; }

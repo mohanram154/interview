@@ -23,7 +23,9 @@ export interface Evaluation {
 export interface Answer {
   id: number;
   interviewQuestionId: number;
-  answerText: string;
+  answerText?: string;
+  selectedOption?: string;
+  isCorrect?: boolean;
   answerStatus: string;
   submittedAt: string;
   evaluation?: Evaluation;
@@ -37,6 +39,16 @@ export interface InterviewQuestion {
   questionText: string;
   category: string;
   difficulty: string;
+  optionA?: string;
+  optionB?: string;
+  optionC?: string;
+  optionD?: string;
+  correctOption?: string;
+  explanation?: string;
+  questionType?: string;
+  markedForReview?: boolean;
+  selectedOption?: string;
+  isCorrect?: boolean;
   answered: boolean;
   answer?: Answer;
 }
@@ -47,7 +59,7 @@ export interface Interview {
   jobRoleId: number;
   jobRoleName: string;
   difficulty: string;
-  mode: 'TEXT' | 'VOICE';
+  mode: 'MCQ' | 'TEXT' | 'VOICE';
   status: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
   totalQuestions: number;
   answeredQuestionsCount: number;
@@ -66,6 +78,10 @@ export interface Report {
   technicalScore: number;
   communicationScore: number;
   summary: string;
+  totalQuestionsCount?: number;
+  correctAnswersCount?: number;
+  incorrectAnswersCount?: number;
+  unansweredCount?: number;
   strengths: string[];
   improvementAreas: string[];
   recommendations: string[];
@@ -84,6 +100,13 @@ export interface DashboardStats {
 export interface CreateInterviewPayload {
   jobRoleId: number;
   difficulty: string;
-  mode: 'TEXT' | 'VOICE';
+  mode: 'MCQ' | 'TEXT' | 'VOICE';
   questionCount: number;
+}
+
+export interface SubmitAnswerPayload {
+  interviewQuestionId: number;
+  answerText?: string;
+  selectedOption?: string;
+  markedForReview?: boolean;
 }

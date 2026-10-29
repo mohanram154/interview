@@ -28,3 +28,4 @@ public class ReportController {
         return ResponseEntity.ok(ApiResponse.success("Candidate report history retrieved", reports));
     }
 }
+

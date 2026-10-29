@@ -107,3 +107,4 @@ class AuthServiceTest {
         assertTrue(ex.getMessage().contains("GOOGLE_CLIENT_ID"));
     }
 }
+

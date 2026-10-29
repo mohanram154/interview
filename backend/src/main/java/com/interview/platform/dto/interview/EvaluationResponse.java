@@ -52,3 +52,4 @@ public class EvaluationResponse {
     public String getEvaluationStatus() { return evaluationStatus; }
     public void setEvaluationStatus(String evaluationStatus) { this.evaluationStatus = evaluationStatus; }
 }
+

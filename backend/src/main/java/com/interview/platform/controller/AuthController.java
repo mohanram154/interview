@@ -53,3 +53,4 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Logged out successfully", "Session terminated"));
     }
 }
+

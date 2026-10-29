@@ -40,3 +40,4 @@ public class JobRoleService {
         return questionRepository.findByJobRoleIdAndActiveTrue(roleId);
     }
 }
+

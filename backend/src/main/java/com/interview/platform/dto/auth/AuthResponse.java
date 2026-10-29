@@ -22,3 +22,4 @@ public class AuthResponse {
     public UserResponse getUser() { return user; }
     public void setUser(UserResponse user) { this.user = user; }
 }
+

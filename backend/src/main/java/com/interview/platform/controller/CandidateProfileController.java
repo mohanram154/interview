@@ -34,3 +34,4 @@ public class CandidateProfileController {
         return ResponseEntity.ok(ApiResponse.success("Candidate profile updated successfully", response));
     }
 }
+

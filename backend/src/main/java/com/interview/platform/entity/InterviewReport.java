@@ -39,6 +39,18 @@ public class InterviewReport {
     @Column(name = "report_status", nullable = false, length = 50)
     private String reportStatus = "COMPLETED";
 
+    @Column(name = "total_questions_count")
+    private Integer totalQuestionsCount;
+
+    @Column(name = "correct_answers_count")
+    private Integer correctAnswersCount;
+
+    @Column(name = "incorrect_answers_count")
+    private Integer incorrectAnswersCount;
+
+    @Column(name = "unanswered_count")
+    private Integer unansweredCount;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -73,6 +85,18 @@ public class InterviewReport {
 
     public String getReportStatus() { return reportStatus; }
     public void setReportStatus(String reportStatus) { this.reportStatus = reportStatus; }
+
+    public Integer getTotalQuestionsCount() { return totalQuestionsCount; }
+    public void setTotalQuestionsCount(Integer totalQuestionsCount) { this.totalQuestionsCount = totalQuestionsCount; }
+
+    public Integer getCorrectAnswersCount() { return correctAnswersCount; }
+    public void setCorrectAnswersCount(Integer correctAnswersCount) { this.correctAnswersCount = correctAnswersCount; }
+
+    public Integer getIncorrectAnswersCount() { return incorrectAnswersCount; }
+    public void setIncorrectAnswersCount(Integer incorrectAnswersCount) { this.incorrectAnswersCount = incorrectAnswersCount; }
+
+    public Integer getUnansweredCount() { return unansweredCount; }
+    public void setUnansweredCount(Integer unansweredCount) { this.unansweredCount = unansweredCount; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

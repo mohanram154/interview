@@ -14,11 +14,11 @@ public class CreateInterviewRequest {
     private String difficulty = "INTERMEDIATE"; // BEGINNER, INTERMEDIATE, ADVANCED
 
     @NotBlank(message = "Mode is required")
-    private String mode = "TEXT"; // TEXT, VOICE
+    private String mode = "MCQ"; // MCQ, TEXT, VOICE
 
     @Min(value = 1, message = "Minimum 1 question")
-    @Max(value = 10, message = "Maximum 10 questions")
-    private int questionCount = 5;
+    @Max(value = 30, message = "Maximum 30 questions")
+    private int questionCount = 20; // Default 20 questions (allows 15 or 20)
 
     public CreateInterviewRequest() {}
 

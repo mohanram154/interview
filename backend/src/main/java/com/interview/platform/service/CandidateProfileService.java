@@ -70,3 +70,4 @@ public class CandidateProfileService {
         return response;
     }
 }
+

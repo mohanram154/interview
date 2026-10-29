@@ -21,14 +21,19 @@ Technical interview preparation often suffers from three major challenges:
 
 ## 2. Project Objectives
 - Provide realistic mock interviews across 6 key technical domains: **Java Developer, Python Developer, Full Stack Developer, Frontend Developer, Backend Developer, and SQL/Database Engineer**.
-- Support flexible interaction modes: **Voice Mode** (speech synthesis question read-aloud + live editable speech-to-text recognition) and **Text Mode** (syntax-focused structured writing).
-- Evaluate candidate answers against a weighted rubric:
-  - **Technical Accuracy (40%)**
-  - **Relevance (25%)**
-  - **Completeness (20%)**
-  - **Communication Clarity (15%)**
-- Provide linguistic sentiment indicators (confidence, filler word count, hesitation patterns) with explicit separation from technical competence.
-- Persist users, profiles, interview sessions, question snapshots, answers, evaluations, and reports reliably in MySQL using Flyway migrations.
+- **Interactive MCQ Assessment Round (15–20 Questions)**:
+  - Default 20 questions (choice of 15 or 20 questions per session).
+  - 4 selectable options (A, B, C, D) with single verified correct answer.
+  - Question navigation palette, mark-for-review toggle, and autosaved progress.
+  - Objective backend scoring without negative marking: $\text{Score} = (\text{Correct Answers} / \text{Total Questions}) \times 100$.
+  - Post-submission scorecard revealing total questions, correct, incorrect, unanswered, percentage score, verified explanations, and topics needing improvement.
+- **Multimodal Subjective Modes (Preserved)**: **Voice Mode** (speech synthesis question read-aloud + live speech-to-text recognition) and **Text Mode** (syntax-focused structured writing).
+- **Clean SaaS White & Violet Design**:
+  - Palette: Primary violet (`#7C3AED`), Dark violet (`#5B21B6`), Light violet (`#EDE9FE`), Page bg (`#FFFFFF`), Secondary bg (`#F5F3FF`), Primary text (`#1F2937`), Secondary text (`#6B7280`), Borders (`#E5E7EB`).
+- Evaluate candidate answers against calibrated rubrics:
+  - **Objective MCQ**: Exact option validation + topic categorization.
+  - **Technical Subjective**: Technical Accuracy (40%), Relevance (25%), Completeness (20%), Clarity (15%).
+- Persist users, profiles, interview sessions, question snapshots, answers, evaluations, and reports reliably in MySQL using Flyway migrations (V1, V2, and V3).
 
 ---
 
@@ -551,3 +556,4 @@ Executes `tsc` type-checking and `vite build` production minification.
 - [x] Recharts competency trends on candidate dashboard.
 - [x] All automated tests passing across backend, AI service, and frontend.
 - [x] Dockerfile & docker-compose configurations.
+

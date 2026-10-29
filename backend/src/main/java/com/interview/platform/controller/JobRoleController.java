@@ -37,3 +37,4 @@ public class JobRoleController {
         return ResponseEntity.ok(ApiResponse.success("Questions retrieved for job role", questions));
     }
 }
+

@@ -16,3 +16,4 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
     Optional<Interview> findByIdAndUserId(Long id, Long userId);
     long countByUserIdAndStatus(Long userId, String status);
 }
+

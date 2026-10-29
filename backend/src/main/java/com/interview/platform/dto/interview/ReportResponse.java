@@ -12,6 +12,10 @@ public class ReportResponse {
     private double overallScore;
     private double technicalScore;
     private double communicationScore;
+    private Integer totalQuestionsCount;
+    private Integer correctAnswersCount;
+    private Integer incorrectAnswersCount;
+    private Integer unansweredCount;
     private String summary;
     private List<String> strengths;
     private List<String> improvementAreas;
@@ -45,6 +49,18 @@ public class ReportResponse {
 
     public double getCommunicationScore() { return communicationScore; }
     public void setCommunicationScore(double communicationScore) { this.communicationScore = communicationScore; }
+
+    public Integer getTotalQuestionsCount() { return totalQuestionsCount; }
+    public void setTotalQuestionsCount(Integer totalQuestionsCount) { this.totalQuestionsCount = totalQuestionsCount; }
+
+    public Integer getCorrectAnswersCount() { return correctAnswersCount; }
+    public void setCorrectAnswersCount(Integer correctAnswersCount) { this.correctAnswersCount = correctAnswersCount; }
+
+    public Integer getIncorrectAnswersCount() { return incorrectAnswersCount; }
+    public void setIncorrectAnswersCount(Integer incorrectAnswersCount) { this.incorrectAnswersCount = incorrectAnswersCount; }
+
+    public Integer getUnansweredCount() { return unansweredCount; }
+    public void setUnansweredCount(Integer unansweredCount) { this.unansweredCount = unansweredCount; }
 
     public String getSummary() { return summary; }
     public void setSummary(String summary) { this.summary = summary; }

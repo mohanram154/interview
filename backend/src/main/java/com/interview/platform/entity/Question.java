@@ -27,6 +27,27 @@ public class Question {
     @Column(name = "expected_topics", nullable = false, columnDefinition = "TEXT")
     private String expectedTopics;
 
+    @Column(name = "option_a", columnDefinition = "TEXT")
+    private String optionA;
+
+    @Column(name = "option_b", columnDefinition = "TEXT")
+    private String optionB;
+
+    @Column(name = "option_c", columnDefinition = "TEXT")
+    private String optionC;
+
+    @Column(name = "option_d", columnDefinition = "TEXT")
+    private String optionD;
+
+    @Column(name = "correct_option", length = 10)
+    private String correctOption;
+
+    @Column(columnDefinition = "TEXT")
+    private String explanation;
+
+    @Column(name = "question_type", nullable = false, length = 20)
+    private String questionType = "THEORETICAL"; // THEORETICAL, MCQ
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -52,6 +73,27 @@ public class Question {
 
     public String getExpectedTopics() { return expectedTopics; }
     public void setExpectedTopics(String expectedTopics) { this.expectedTopics = expectedTopics; }
+
+    public String getOptionA() { return optionA; }
+    public void setOptionA(String optionA) { this.optionA = optionA; }
+
+    public String getOptionB() { return optionB; }
+    public void setOptionB(String optionB) { this.optionB = optionB; }
+
+    public String getOptionC() { return optionC; }
+    public void setOptionC(String optionC) { this.optionC = optionC; }
+
+    public String getOptionD() { return optionD; }
+    public void setOptionD(String optionD) { this.optionD = optionD; }
+
+    public String getCorrectOption() { return correctOption; }
+    public void setCorrectOption(String correctOption) { this.correctOption = correctOption; }
+
+    public String getExplanation() { return explanation; }
+    public void setExplanation(String explanation) { this.explanation = explanation; }
+
+    public String getQuestionType() { return questionType; }
+    public void setQuestionType(String questionType) { this.questionType = questionType; }
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }

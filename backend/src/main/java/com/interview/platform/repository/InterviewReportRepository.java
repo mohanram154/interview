@@ -19,3 +19,4 @@ public interface InterviewReportRepository extends JpaRepository<InterviewReport
     @Query("SELECT AVG(r.overallScore) FROM InterviewReport r JOIN r.interview i WHERE i.user.id = :userId")
     Double getAverageScoreByUserId(@Param("userId") Long userId);
 }
+

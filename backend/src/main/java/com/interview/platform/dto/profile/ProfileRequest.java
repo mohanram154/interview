@@ -28,3 +28,4 @@ public class ProfileRequest {
     public String getPreferredRole() { return preferredRole; }
     public void setPreferredRole(String preferredRole) { this.preferredRole = preferredRole; }
 }
+

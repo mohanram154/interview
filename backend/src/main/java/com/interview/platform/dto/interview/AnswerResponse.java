@@ -6,6 +6,8 @@ public class AnswerResponse {
     private Long id;
     private Long interviewQuestionId;
     private String answerText;
+    private String selectedOption;
+    private Boolean isCorrect;
     private String answerStatus;
     private LocalDateTime submittedAt;
     private EvaluationResponse evaluation;
@@ -20,6 +22,12 @@ public class AnswerResponse {
 
     public String getAnswerText() { return answerText; }
     public void setAnswerText(String answerText) { this.answerText = answerText; }
+
+    public String getSelectedOption() { return selectedOption; }
+    public void setSelectedOption(String selectedOption) { this.selectedOption = selectedOption; }
+
+    public Boolean getIsCorrect() { return isCorrect; }
+    public void setIsCorrect(Boolean isCorrect) { this.isCorrect = isCorrect; }
 
     public String getAnswerStatus() { return answerStatus; }
     public void setAnswerStatus(String answerStatus) { this.answerStatus = answerStatus; }

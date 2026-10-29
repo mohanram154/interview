@@ -20,3 +20,4 @@ export interface ProfileUpdateRequest {
   experienceYears: number;
   preferredRole?: string;
 }
+

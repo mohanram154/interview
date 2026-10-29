@@ -13,6 +13,15 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     List<Question> findByJobRoleIdAndActiveTrue(Long jobRoleId);
     List<Question> findByJobRoleIdAndDifficultyIgnoreCaseAndActiveTrue(Long jobRoleId, String difficulty);
 
+    List<Question> findByJobRoleIdAndQuestionTypeAndActiveTrue(Long jobRoleId, String questionType);
+    List<Question> findByJobRoleIdAndDifficultyIgnoreCaseAndQuestionTypeAndActiveTrue(Long jobRoleId, String difficulty, String questionType);
+
     @Query(value = "SELECT * FROM questions WHERE job_role_id = :roleId AND difficulty = :difficulty AND active = true ORDER BY RAND() LIMIT :limit", nativeQuery = true)
     List<Question> findRandomQuestions(@Param("roleId") Long roleId, @Param("difficulty") String difficulty, @Param("limit") int limit);
+
+    @Query(value = "SELECT * FROM questions WHERE job_role_id = :roleId AND difficulty = :difficulty AND question_type = :questionType AND active = true ORDER BY RAND() LIMIT :limit", nativeQuery = true)
+    List<Question> findRandomQuestionsByType(@Param("roleId") Long roleId, @Param("difficulty") String difficulty, @Param("questionType") String questionType, @Param("limit") int limit);
+
+    @Query(value = "SELECT * FROM questions WHERE job_role_id = :roleId AND question_type = :questionType AND active = true ORDER BY RAND() LIMIT :limit", nativeQuery = true)
+    List<Question> findRandomQuestionsByRoleAndType(@Param("roleId") Long roleId, @Param("questionType") String questionType, @Param("limit") int limit);
 }

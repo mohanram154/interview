@@ -37,3 +37,4 @@ public class AiEvaluationRequest {
     public String getExpectedTopics() { return expectedTopics; }
     public void setExpectedTopics(String expectedTopics) { this.expectedTopics = expectedTopics; }
 }
+

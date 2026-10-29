@@ -79,6 +79,17 @@ public class InterviewController {
         return ResponseEntity.ok(ApiResponse.success("Answer evaluated and saved successfully", response));
     }
 
+    @PutMapping("/{id}/questions/{questionId}/review")
+    public ResponseEntity<ApiResponse<Boolean>> toggleMarkForReview(
+            @PathVariable Long id,
+            @PathVariable Long questionId,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) Boolean marked
+    ) {
+        boolean result = interviewService.toggleMarkForReview(id, questionId, principal.getId(), marked);
+        return ResponseEntity.ok(ApiResponse.success("Question review status updated", result));
+    }
+
     @PostMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<ReportResponse>> completeInterview(
             @PathVariable Long id,

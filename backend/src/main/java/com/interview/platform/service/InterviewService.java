@@ -59,24 +59,62 @@ public class InterviewService {
         JobRole jobRole = jobRoleRepository.findById(request.getJobRoleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Job role not found with ID: " + request.getJobRoleId()));
 
-        String difficulty = request.getDifficulty().toUpperCase();
-        String mode = request.getMode().toUpperCase();
-        int questionCount = Math.max(1, Math.min(10, request.getQuestionCount()));
+        String difficulty = request.getDifficulty() != null ? request.getDifficulty().toUpperCase() : "INTERMEDIATE";
+        String mode = request.getMode() != null ? request.getMode().toUpperCase() : "MCQ";
+        int requestedCount = request.getQuestionCount() > 0 ? request.getQuestionCount() : 20;
+        int questionCount = Math.max(1, Math.min(25, requestedCount));
 
-        // Fetch questions for role
-        List<Question> availableQuestions = questionRepository.findByJobRoleIdAndDifficultyIgnoreCaseAndActiveTrue(jobRole.getId(), difficulty);
-        if (availableQuestions.isEmpty()) {
-            availableQuestions = questionRepository.findByJobRoleIdAndActiveTrue(jobRole.getId());
+        List<Question> selectedQuestions = new ArrayList<>();
+
+        if ("MCQ".equalsIgnoreCase(mode)) {
+            // Prioritize questions matching selected difficulty
+            List<Question> diffQuestions = new ArrayList<>(
+                    questionRepository.findByJobRoleIdAndDifficultyIgnoreCaseAndQuestionTypeAndActiveTrue(jobRole.getId(), difficulty, "MCQ")
+            );
+            Collections.shuffle(diffQuestions);
+            selectedQuestions.addAll(diffQuestions);
+
+            // If we need more to reach requested count, pull from other difficulties of the same role
+            if (selectedQuestions.size() < questionCount) {
+                List<Question> roleQuestions = new ArrayList<>(
+                        questionRepository.findByJobRoleIdAndQuestionTypeAndActiveTrue(jobRole.getId(), "MCQ")
+                );
+                Collections.shuffle(roleQuestions);
+                for (Question q : roleQuestions) {
+                    if (!selectedQuestions.contains(q)) {
+                        selectedQuestions.add(q);
+                    }
+                    if (selectedQuestions.size() >= questionCount) break;
+                }
+            }
+
+            // Fallback to any active questions if still empty
+            if (selectedQuestions.isEmpty()) {
+                selectedQuestions.addAll(questionRepository.findByJobRoleIdAndActiveTrue(jobRole.getId()));
+                Collections.shuffle(selectedQuestions);
+            }
+
+            if (selectedQuestions.size() > questionCount) {
+                selectedQuestions = selectedQuestions.subList(0, questionCount);
+            }
+        } else {
+            // Non-MCQ modes (TEXT, VOICE)
+            List<Question> availableQuestions = questionRepository.findByJobRoleIdAndDifficultyIgnoreCaseAndActiveTrue(jobRole.getId(), difficulty);
+            if (availableQuestions.isEmpty()) {
+                availableQuestions = questionRepository.findByJobRoleIdAndActiveTrue(jobRole.getId());
+            }
+            if (availableQuestions.isEmpty()) {
+                throw new BadRequestException("No questions available for role: " + jobRole.getName());
+            }
+            Collections.shuffle(availableQuestions);
+            selectedQuestions = availableQuestions.stream()
+                    .limit(Math.min(10, questionCount))
+                    .collect(Collectors.toList());
         }
 
-        if (availableQuestions.isEmpty()) {
+        if (selectedQuestions.isEmpty()) {
             throw new BadRequestException("No questions available for role: " + jobRole.getName());
         }
-
-        Collections.shuffle(availableQuestions);
-        List<Question> selectedQuestions = availableQuestions.stream()
-                .limit(questionCount)
-                .collect(Collectors.toList());
 
         Interview interview = new Interview();
         interview.setUser(user);
@@ -100,6 +138,14 @@ public class InterviewService {
             iq.setCategory(q.getCategory());
             iq.setDifficulty(q.getDifficulty());
             iq.setExpectedTopics(q.getExpectedTopics());
+            iq.setOptionA(q.getOptionA());
+            iq.setOptionB(q.getOptionB());
+            iq.setOptionC(q.getOptionC());
+            iq.setOptionD(q.getOptionD());
+            iq.setCorrectOption(q.getCorrectOption());
+            iq.setExplanation(q.getExplanation());
+            iq.setQuestionType(q.getQuestionType() != null ? q.getQuestionType() : "MCQ");
+            iq.setMarkedForReview(false);
             interviewQuestions.add(iq);
         }
 
@@ -131,7 +177,10 @@ public class InterviewService {
         }
 
         List<InterviewQuestion> questions = interviewQuestionRepository.findByInterviewIdOrderBySequenceNumberAsc(interviewId);
-        return questions.stream().map(this::mapToInterviewQuestionResponse).collect(Collectors.toList());
+        boolean isCompleted = "COMPLETED".equalsIgnoreCase(interview.getStatus());
+        return questions.stream()
+                .map(q -> mapToInterviewQuestionResponse(q, isCompleted))
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -146,45 +195,96 @@ public class InterviewService {
         InterviewQuestion question = interviewQuestionRepository.findByIdAndInterviewId(request.getInterviewQuestionId(), interviewId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found in this interview."));
 
-        if (answerRepository.existsByInterviewQuestionId(question.getId())) {
-            throw new BadRequestException("An answer has already been submitted for this question.");
+        if (request.getMarkedForReview() != null) {
+            question.setMarkedForReview(request.getMarkedForReview());
+            interviewQuestionRepository.save(question);
         }
 
-        // Persist Answer
-        Answer answer = new Answer(question, request.getAnswerText().trim());
-        Answer savedAnswer = answerRepository.save(answer);
+        boolean isMcq = "MCQ".equalsIgnoreCase(question.getQuestionType())
+                || "MCQ".equalsIgnoreCase(interview.getMode())
+                || (request.getSelectedOption() != null && !request.getSelectedOption().isBlank());
 
-        // Call AI Service
-        AiEvaluationRequest aiRequest = new AiEvaluationRequest(
-                question.getQuestionTextSnapshot(),
-                savedAnswer.getAnswerText(),
-                interview.getJobRole().getName(),
-                question.getDifficulty(),
-                question.getCategory(),
-                question.getExpectedTopics()
-        );
+        if (isMcq) {
+            // MCQ flow: allow changing answers before final submission
+            Optional<Answer> existingOpt = answerRepository.findByInterviewQuestionId(question.getId());
+            Answer answer = existingOpt.orElseGet(() -> new Answer(question, null));
 
-        AiEvaluationResponse aiResponse = aiServiceClient.evaluateAnswer(aiRequest);
+            String selected = request.getSelectedOption() != null ? request.getSelectedOption().trim().toUpperCase() : null;
+            if (selected != null) {
+                answer.setSelectedOption(selected);
+                answer.setAnswerText("Option " + selected);
+                if (question.getCorrectOption() != null) {
+                    answer.setIsCorrect(selected.equalsIgnoreCase(question.getCorrectOption().trim()));
+                }
+            } else if (request.getAnswerText() != null && !request.getAnswerText().isBlank()) {
+                answer.setAnswerText(request.getAnswerText().trim());
+            }
 
-        // Persist Evaluation
-        Evaluation evaluation = new Evaluation();
-        evaluation.setAnswer(savedAnswer);
-        evaluation.setTechnicalAccuracyScore(aiResponse.getTechnicalAccuracyScore());
-        evaluation.setRelevanceScore(aiResponse.getRelevanceScore());
-        evaluation.setCompletenessScore(aiResponse.getCompletenessScore());
-        evaluation.setClarityScore(aiResponse.getClarityScore());
-        evaluation.setOverallScore(aiResponse.getOverallScore());
-        evaluation.setSentimentLabel(aiResponse.getSentimentLabel());
-        evaluation.setSentimentConfidence(aiResponse.getSentimentConfidence());
-        evaluation.setFeedback(aiResponse.getFeedback() != null ? aiResponse.getFeedback() : "Evaluation completed.");
-        evaluation.setStrengths(aiResponse.getStrengths() != null ? String.join(";;", aiResponse.getStrengths()) : "Good attempt.");
-        evaluation.setImprovements(aiResponse.getImprovements() != null ? String.join(";;", aiResponse.getImprovements()) : "Continue practicing.");
-        evaluation.setEvaluationStatus(aiResponse.getEvaluationStatus() != null ? aiResponse.getEvaluationStatus() : "COMPLETED");
+            answer.setAnswerStatus("SUBMITTED");
+            answer.setSubmittedAt(LocalDateTime.now());
+            Answer savedAnswer = answerRepository.save(answer);
 
-        Evaluation savedEvaluation = evaluationRepository.save(evaluation);
-        savedAnswer.setEvaluation(savedEvaluation);
+            boolean isCompleted = "COMPLETED".equalsIgnoreCase(interview.getStatus());
+            return mapToAnswerResponse(savedAnswer, isCompleted);
+        } else {
+            // Text/Voice interview flow
+            if (answerRepository.existsByInterviewQuestionId(question.getId())) {
+                throw new BadRequestException("An answer has already been submitted for this question.");
+            }
 
-        return mapToAnswerResponse(savedAnswer);
+            Answer answer = new Answer(question, request.getAnswerText() != null ? request.getAnswerText().trim() : "");
+            Answer savedAnswer = answerRepository.save(answer);
+
+            // Call AI Service
+            AiEvaluationRequest aiRequest = new AiEvaluationRequest(
+                    question.getQuestionTextSnapshot(),
+                    savedAnswer.getAnswerText(),
+                    interview.getJobRole().getName(),
+                    question.getDifficulty(),
+                    question.getCategory(),
+                    question.getExpectedTopics()
+            );
+
+            AiEvaluationResponse aiResponse = aiServiceClient.evaluateAnswer(aiRequest);
+
+            // Persist Evaluation
+            Evaluation evaluation = new Evaluation();
+            evaluation.setAnswer(savedAnswer);
+            evaluation.setTechnicalAccuracyScore(aiResponse.getTechnicalAccuracyScore());
+            evaluation.setRelevanceScore(aiResponse.getRelevanceScore());
+            evaluation.setCompletenessScore(aiResponse.getCompletenessScore());
+            evaluation.setClarityScore(aiResponse.getClarityScore());
+            evaluation.setOverallScore(aiResponse.getOverallScore());
+            evaluation.setSentimentLabel(aiResponse.getSentimentLabel());
+            evaluation.setSentimentConfidence(aiResponse.getSentimentConfidence());
+            evaluation.setFeedback(aiResponse.getFeedback() != null ? aiResponse.getFeedback() : "Evaluation completed.");
+            evaluation.setStrengths(aiResponse.getStrengths() != null ? String.join(";;", aiResponse.getStrengths()) : "Good attempt.");
+            evaluation.setImprovements(aiResponse.getImprovements() != null ? String.join(";;", aiResponse.getImprovements()) : "Continue practicing.");
+            evaluation.setEvaluationStatus(aiResponse.getEvaluationStatus() != null ? aiResponse.getEvaluationStatus() : "COMPLETED");
+
+            Evaluation savedEvaluation = evaluationRepository.save(evaluation);
+            savedAnswer.setEvaluation(savedEvaluation);
+
+            return mapToAnswerResponse(savedAnswer, false);
+        }
+    }
+
+    @Transactional
+    public boolean toggleMarkForReview(Long interviewId, Long questionId, Long userId, Boolean marked) {
+        Interview interview = interviewRepository.findById(interviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Interview not found with ID: " + interviewId));
+
+        if (!interview.getUser().getId().equals(userId)) {
+            throw new UnauthorizedAccessException("You are not authorized to update this question.");
+        }
+
+        InterviewQuestion question = interviewQuestionRepository.findByIdAndInterviewId(questionId, interviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found in this interview."));
+
+        boolean newState = (marked != null) ? marked : !Boolean.TRUE.equals(question.getMarkedForReview());
+        question.setMarkedForReview(newState);
+        interviewQuestionRepository.save(question);
+        return newState;
     }
 
     @Transactional(readOnly = true)
@@ -223,9 +323,12 @@ public class InterviewService {
         resp.setStartedAt(interview.getStartedAt());
         resp.setCompletedAt(interview.getCompletedAt());
 
+        boolean isCompleted = "COMPLETED".equalsIgnoreCase(interview.getStatus());
         List<InterviewQuestion> questions = interview.getQuestions();
         if (questions != null) {
-            resp.setQuestions(questions.stream().map(this::mapToInterviewQuestionResponse).collect(Collectors.toList()));
+            resp.setQuestions(questions.stream()
+                    .map(q -> mapToInterviewQuestionResponse(q, isCompleted))
+                    .collect(Collectors.toList()));
             long answered = questions.stream().filter(q -> q.getAnswer() != null).count();
             resp.setAnsweredQuestionsCount((int) answered);
         } else {
@@ -237,17 +340,38 @@ public class InterviewService {
     }
 
     public InterviewQuestionResponse mapToInterviewQuestionResponse(InterviewQuestion iq) {
+        boolean isCompleted = iq.getInterview() != null && "COMPLETED".equalsIgnoreCase(iq.getInterview().getStatus());
+        return mapToInterviewQuestionResponse(iq, isCompleted);
+    }
+
+    public InterviewQuestionResponse mapToInterviewQuestionResponse(InterviewQuestion iq, boolean isCompleted) {
         InterviewQuestionResponse resp = new InterviewQuestionResponse();
         resp.setId(iq.getId());
         resp.setSequenceNumber(iq.getSequenceNumber());
         resp.setQuestionText(iq.getQuestionTextSnapshot());
         resp.setCategory(iq.getCategory());
         resp.setDifficulty(iq.getDifficulty());
+        resp.setOptionA(iq.getOptionA());
+        resp.setOptionB(iq.getOptionB());
+        resp.setOptionC(iq.getOptionC());
+        resp.setOptionD(iq.getOptionD());
+        resp.setQuestionType(iq.getQuestionType() != null ? iq.getQuestionType() : "MCQ");
+        resp.setMarkedForReview(Boolean.TRUE.equals(iq.getMarkedForReview()));
+
+        // Security check: Only reveal correctOption and explanation AFTER submission/completion
+        if (isCompleted) {
+            resp.setCorrectOption(iq.getCorrectOption());
+            resp.setExplanation(iq.getExplanation());
+        }
 
         Answer answer = iq.getAnswer();
         if (answer != null) {
             resp.setAnswered(true);
-            resp.setAnswer(mapToAnswerResponse(answer));
+            resp.setSelectedOption(answer.getSelectedOption());
+            if (isCompleted) {
+                resp.setIsCorrect(answer.getIsCorrect());
+            }
+            resp.setAnswer(mapToAnswerResponse(answer, isCompleted));
         } else {
             resp.setAnswered(false);
         }
@@ -256,10 +380,18 @@ public class InterviewService {
     }
 
     public AnswerResponse mapToAnswerResponse(Answer answer) {
+        return mapToAnswerResponse(answer, false);
+    }
+
+    public AnswerResponse mapToAnswerResponse(Answer answer, boolean isCompleted) {
         AnswerResponse resp = new AnswerResponse();
         resp.setId(answer.getId());
         resp.setInterviewQuestionId(answer.getInterviewQuestion().getId());
         resp.setAnswerText(answer.getAnswerText());
+        resp.setSelectedOption(answer.getSelectedOption());
+        if (isCompleted) {
+            resp.setIsCorrect(answer.getIsCorrect());
+        }
         resp.setAnswerStatus(answer.getAnswerStatus());
         resp.setSubmittedAt(answer.getSubmittedAt());
 

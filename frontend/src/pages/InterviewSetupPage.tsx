@@ -5,14 +5,13 @@ import { JobRole, CreateInterviewPayload, Interview } from '../types/interview';
 import { ApiResponse } from '../types/auth';
 import { 
   PlayCircle, 
+  HelpCircle, 
   Mic, 
   FileText, 
-  Zap, 
-  HelpCircle, 
   Loader2, 
   AlertCircle,
-  Layers,
-  Sparkles
+  Sparkles,
+  CheckCircle2
 } from 'lucide-react';
 
 export const InterviewSetupPage: React.FC = () => {
@@ -22,8 +21,8 @@ export const InterviewSetupPage: React.FC = () => {
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [difficulty, setDifficulty] = useState<string>('INTERMEDIATE');
-  const [mode, setMode] = useState<'TEXT' | 'VOICE'>('TEXT');
-  const [questionCount, setQuestionCount] = useState<number>(5);
+  const [mode, setMode] = useState<'MCQ' | 'TEXT' | 'VOICE'>('MCQ');
+  const [questionCount, setQuestionCount] = useState<number>(20);
 
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
@@ -52,6 +51,16 @@ export const InterviewSetupPage: React.FC = () => {
 
     fetchRoles();
   }, [location.state]);
+
+  // Adjust question count when switching modes
+  const handleModeChange = (newMode: 'MCQ' | 'TEXT' | 'VOICE') => {
+    setMode(newMode);
+    if (newMode === 'MCQ') {
+      setQuestionCount(20);
+    } else {
+      setQuestionCount(5);
+    }
+  };
 
   const handleStartInterview = async () => {
     if (!selectedRoleId) {
@@ -85,36 +94,36 @@ export const InterviewSetupPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-8 h-8 text-sky-400 animate-spin" />
-        <span className="text-sm text-slate-400">Loading interview environments...</span>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3 bg-white">
+        <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
+        <span className="text-sm text-gray-500">Loading interview environments...</span>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-4 sm:px-6 lg:px-8 space-y-8">
+    <div className="max-w-4xl mx-auto py-10 px-4 sm:px-6 lg:px-8 space-y-8 bg-white">
       <div>
-        <div className="text-xs font-semibold text-sky-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold uppercase tracking-wider mb-2">
+          <Sparkles className="w-3.5 h-3.5 text-violet-600" />
           <span>Session Configurator</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Setup Mock Interview</h1>
-        <p className="mt-1 text-xs sm:text-sm text-slate-400">
-          Configure your technical domain, difficulty tier, and preferred interaction mode.
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Setup Technical Interview</h1>
+        <p className="mt-1 text-xs sm:text-sm text-gray-500">
+          Configure your technical domain, difficulty tier, and interview round format.
         </p>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 shrink-0" />
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
           <span>{error}</span>
         </div>
       )}
 
       {/* 1. Job Role Selection */}
       <div className="space-y-3">
-        <label className="block text-sm font-semibold text-slate-200">
+        <label className="block text-sm font-bold text-gray-900">
           1. Select Technical Domain / Role
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -127,12 +136,15 @@ export const InterviewSetupPage: React.FC = () => {
                 onClick={() => setSelectedRoleId(role.id)}
                 className={`p-4 rounded-xl text-left border transition-all ${
                   isSelected
-                    ? 'bg-sky-500/10 border-sky-500 text-white shadow-md shadow-sky-500/10'
-                    : 'bg-slate-800/40 border-slate-700/80 text-slate-300 hover:border-slate-600'
+                    ? 'bg-violet-50 border-violet-600 text-gray-900 shadow-sm ring-1 ring-violet-600'
+                    : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                <div className="font-semibold text-sm mb-1">{role.name}</div>
-                <div className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-sm text-gray-900">{role.name}</span>
+                  {isSelected && <CheckCircle2 className="w-4 h-4 text-violet-600" />}
+                </div>
+                <div className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">
                   {role.description}
                 </div>
               </button>
@@ -143,119 +155,206 @@ export const InterviewSetupPage: React.FC = () => {
 
       {/* 2. Difficulty Selection */}
       <div className="space-y-3">
-        <label className="block text-sm font-semibold text-slate-200">
+        <label className="block text-sm font-bold text-gray-900">
           2. Select Difficulty Level
         </label>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            { id: 'BEGINNER', label: 'Beginner', desc: 'Core fundamentals & definitions' },
-            { id: 'INTERMEDIATE', label: 'Intermediate', desc: 'Architecture, trade-offs & APIs' },
-            { id: 'ADVANCED', label: 'Advanced', desc: 'Concurrency, internals & scalability' },
-          ].map((d) => (
-            <button
-              type="button"
-              key={d.id}
-              onClick={() => setDifficulty(d.id)}
-              className={`p-4 rounded-xl text-left border transition-all ${
-                difficulty === d.id
-                  ? 'bg-sky-500/10 border-sky-500 text-white shadow-sm'
-                  : 'bg-slate-800/40 border-slate-700/80 text-slate-300 hover:border-slate-600'
-              }`}
-            >
-              <div className="font-semibold text-sm mb-0.5">{d.label}</div>
-              <div className="text-[11px] text-slate-400">{d.desc}</div>
-            </button>
-          ))}
+            { id: 'BEGINNER', label: 'Beginner', desc: 'Core fundamentals, keywords & syntax' },
+            { id: 'INTERMEDIATE', label: 'Intermediate', desc: 'Architecture, APIs, trade-offs & design' },
+            { id: 'ADVANCED', label: 'Advanced', desc: 'Concurrency, internals, optimization & scale' },
+          ].map((d) => {
+            const isSelected = difficulty === d.id;
+            return (
+              <button
+                type="button"
+                key={d.id}
+                onClick={() => setDifficulty(d.id)}
+                className={`p-4 rounded-xl text-left border transition-all ${
+                  isSelected
+                    ? 'bg-violet-50 border-violet-600 text-gray-900 shadow-sm ring-1 ring-violet-600'
+                    : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="font-semibold text-sm text-gray-900">{d.label}</span>
+                  {isSelected && <CheckCircle2 className="w-4 h-4 text-violet-600" />}
+                </div>
+                <div className="text-[11px] text-gray-500">{d.desc}</div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* 3. Mode Selection (Voice vs Text) */}
+      {/* 3. Interview Mode Selection */}
       <div className="space-y-3">
-        <label className="block text-sm font-semibold text-slate-200">
-          3. Select Interview Interaction Mode
+        <label className="block text-sm font-bold text-gray-900">
+          3. Select Interview Round Mode
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* MCQ Option */}
           <button
             type="button"
-            onClick={() => setMode('TEXT')}
-            className={`p-4 rounded-xl text-left border flex items-start gap-3.5 transition-all ${
-              mode === 'TEXT'
-                ? 'bg-sky-500/10 border-sky-500 text-white shadow-sm'
-                : 'bg-slate-800/40 border-slate-700/80 text-slate-300 hover:border-slate-600'
+            onClick={() => handleModeChange('MCQ')}
+            className={`p-4 rounded-xl text-left border flex flex-col justify-between transition-all ${
+              mode === 'MCQ'
+                ? 'bg-violet-50 border-violet-600 shadow-sm ring-1 ring-violet-600'
+                : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
             }`}
           >
-            <div className={`p-2.5 rounded-lg ${mode === 'TEXT' ? 'bg-sky-500/20 text-sky-400' : 'bg-slate-700 text-slate-400'}`}>
-              <FileText className="w-5 h-5" />
-            </div>
             <div>
-              <div className="font-semibold text-sm">Text Mode</div>
-              <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                Classic typing interface. Ideal for drafting structured algorithms and detailed code explanations.
+              <div className="flex items-center justify-between mb-2">
+                <div className={`p-2 rounded-lg ${mode === 'MCQ' ? 'bg-violet-600 text-white' : 'bg-violet-100 text-violet-600'}`}>
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
+                  Default Round
+                </span>
+              </div>
+              <div className="font-semibold text-sm text-gray-900 mb-1">MCQ Round</div>
+              <div className="text-[11px] text-gray-500 leading-relaxed">
+                15–20 multiple-choice questions with 4 options, question navigation, mark-for-review & instant scoring.
               </div>
             </div>
+            {mode === 'MCQ' && (
+              <div className="mt-3 text-[11px] font-semibold text-violet-700 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-violet-600" />
+                <span>Selected</span>
+              </div>
+            )}
           </button>
 
+          {/* Text Option */}
           <button
             type="button"
-            onClick={() => setMode('VOICE')}
-            className={`p-4 rounded-xl text-left border flex items-start gap-3.5 transition-all ${
-              mode === 'VOICE'
-                ? 'bg-indigo-500/10 border-indigo-500 text-white shadow-sm'
-                : 'bg-slate-800/40 border-slate-700/80 text-slate-300 hover:border-slate-600'
+            onClick={() => handleModeChange('TEXT')}
+            className={`p-4 rounded-xl text-left border flex flex-col justify-between transition-all ${
+              mode === 'TEXT'
+                ? 'bg-violet-50 border-violet-600 shadow-sm ring-1 ring-violet-600'
+                : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
             }`}
           >
-            <div className={`p-2.5 rounded-lg ${mode === 'VOICE' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-700 text-slate-400'}`}>
-              <Mic className="w-5 h-5" />
-            </div>
             <div>
-              <div className="font-semibold text-sm">Voice Mode</div>
-              <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                Browser Speech Synthesis reads questions aloud; microphone speech recognition transcribes answers with live editable fallback.
+              <div className="flex items-center justify-between mb-2">
+                <div className={`p-2 rounded-lg ${mode === 'TEXT' ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                  <FileText className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] text-gray-400">Written</span>
+              </div>
+              <div className="font-semibold text-sm text-gray-900 mb-1">Text Interview</div>
+              <div className="text-[11px] text-gray-500 leading-relaxed">
+                Written subjective answers evaluated with the Python NLP engine for accuracy, relevance & clarity.
               </div>
             </div>
+            {mode === 'TEXT' && (
+              <div className="mt-3 text-[11px] font-semibold text-violet-700 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-violet-600" />
+                <span>Selected</span>
+              </div>
+            )}
+          </button>
+
+          {/* Voice Option */}
+          <button
+            type="button"
+            onClick={() => handleModeChange('VOICE')}
+            className={`p-4 rounded-xl text-left border flex flex-col justify-between transition-all ${
+              mode === 'VOICE'
+                ? 'bg-violet-50 border-violet-600 shadow-sm ring-1 ring-violet-600'
+                : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className={`p-2 rounded-lg ${mode === 'VOICE' ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                  <Mic className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] text-gray-400">Interactive</span>
+              </div>
+              <div className="font-semibold text-sm text-gray-900 mb-1">Voice Interview</div>
+              <div className="text-[11px] text-gray-500 leading-relaxed">
+                Browser Speech Synthesis reads questions aloud; microphone recognition transcribes spoken answers.
+              </div>
+            </div>
+            {mode === 'VOICE' && (
+              <div className="mt-3 text-[11px] font-semibold text-violet-700 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-violet-600" />
+                <span>Selected</span>
+              </div>
+            )}
           </button>
         </div>
       </div>
 
-      {/* 4. Question Count */}
+      {/* 4. Question Count Selection */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <label className="block text-sm font-semibold text-slate-200">
-            4. Number of Questions
+          <label className="block text-sm font-bold text-gray-900">
+            4. Number of Questions per Session
           </label>
-          <span className="text-xs font-bold text-sky-400">{questionCount} Questions</span>
+          <span className="text-xs font-bold text-violet-600 px-2 py-0.5 rounded bg-violet-100">
+            {questionCount} Questions Selected
+          </span>
         </div>
-        <div className="flex gap-3">
-          {[3, 5, 7].map((num) => (
-            <button
-              type="button"
-              key={num}
-              onClick={() => setQuestionCount(num)}
-              className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                questionCount === num
-                  ? 'bg-sky-500 text-white border-sky-400'
-                  : 'bg-slate-800/60 text-slate-300 border-slate-700 hover:bg-slate-700'
-              }`}
-            >
-              {num} Questions
-            </button>
-          ))}
-        </div>
+
+        {mode === 'MCQ' ? (
+          <div className="grid grid-cols-2 gap-3">
+            {[20, 15].map((num) => (
+              <button
+                type="button"
+                key={num}
+                onClick={() => setQuestionCount(num)}
+                className={`py-3 px-4 rounded-xl text-sm font-semibold border flex items-center justify-between transition-all ${
+                  questionCount === num
+                    ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <span>{num} Multiple Choice Questions</span>
+                {num === 20 && (
+                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
+                    questionCount === 20 ? 'bg-violet-800 text-violet-100' : 'bg-violet-100 text-violet-700'
+                  }`}>
+                    Default
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {[5, 10].map((num) => (
+              <button
+                type="button"
+                key={num}
+                onClick={() => setQuestionCount(num)}
+                className={`py-3 px-4 rounded-xl text-sm font-semibold border transition-all ${
+                  questionCount === num
+                    ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {num} Questions
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Summary Box & Start Action */}
-      <div className="p-6 rounded-2xl bg-slate-800/60 border border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* Summary Box & Action */}
+      <div className="p-6 rounded-2xl bg-violet-50/70 border border-violet-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="text-xs text-slate-400">Ready to begin:</div>
-          <div className="text-sm font-semibold text-white">
-            {selectedRole?.name} • {difficulty} Level • {mode} Mode ({questionCount} Questions)
+          <div className="text-xs text-gray-500 font-medium">Ready to begin:</div>
+          <div className="text-sm font-bold text-gray-900 mt-0.5">
+            {selectedRole?.name} • {difficulty} Level • {mode} Round ({questionCount} Questions)
           </div>
         </div>
 
         <button
           onClick={handleStartInterview}
           disabled={starting}
-          className="w-full sm:w-auto px-7 py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-lg shadow-sky-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+          className="w-full sm:w-auto px-7 py-3 rounded-xl font-semibold text-sm text-white bg-violet-600 hover:bg-violet-700 shadow-sm shadow-violet-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-60"
         >
           {starting ? (
             <>

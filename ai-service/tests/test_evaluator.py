@@ -73,3 +73,4 @@ def test_evaluate_endpoint_validation():
         "difficulty": "BEGINNER"
     })
     assert resp2.status_code == 400
+

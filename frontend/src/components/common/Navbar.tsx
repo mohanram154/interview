@@ -9,8 +9,7 @@ import {
   User, 
   LogOut, 
   Menu, 
-  X,
-  Sparkles
+  X
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -34,21 +33,21 @@ export const Navbar: React.FC = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+    <nav className="bg-white/95 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
             <Link to={isAuthenticated ? '/dashboard' : '/'} className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-violet-800 flex items-center justify-center shadow-md shadow-violet-500/20 group-hover:scale-105 transition-transform">
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
-                <span className="font-bold text-lg bg-gradient-to-r from-sky-400 via-indigo-300 to-white bg-clip-text text-transparent">
-                  SmartInterview AI
+                <span className="font-bold text-lg text-gray-900 tracking-tight">
+                  Smart<span className="text-violet-600">Interview</span>
                 </span>
-                <span className="hidden sm:inline-block ml-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800/60">
-                  v2.0
+                <span className="hidden sm:inline-block ml-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200">
+                  MCQ v2.0
                 </span>
               </div>
             </Link>
@@ -66,11 +65,11 @@ export const Navbar: React.FC = () => {
                     to={link.path}
                     className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
                       active
-                        ? 'bg-sky-500/10 text-sky-400 border border-sky-500/30 shadow-sm shadow-sky-500/10'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                        ? 'bg-violet-100 text-violet-700 font-semibold border border-violet-200 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-violet-50'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${active ? 'text-sky-400' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 ${active ? 'text-violet-600' : 'text-gray-400'}`} />
                     {link.name}
                   </Link>
                 );
@@ -81,14 +80,14 @@ export const Navbar: React.FC = () => {
           {/* Right Section */}
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
-              <div className="flex items-center gap-3 pl-3 border-l border-slate-800">
+              <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
                 <div className="text-right">
-                  <div className="text-xs font-semibold text-slate-200">{user?.name}</div>
-                  <div className="text-[11px] text-slate-400 max-w-[150px] truncate">{user?.email}</div>
+                  <div className="text-xs font-semibold text-gray-900">{user?.name}</div>
+                  <div className="text-[11px] text-gray-500 max-w-[150px] truncate">{user?.email}</div>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  className="p-2 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                   title="Sign out"
                 >
                   <LogOut className="w-4 h-4" />
@@ -98,13 +97,13 @@ export const Navbar: React.FC = () => {
               <div className="flex items-center gap-2.5">
                 <Link
                   to="/login"
-                  className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   Sign in
                 </Link>
                 <Link
                   to="/register"
-                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 rounded-lg shadow-md shadow-sky-500/20 transition-all"
+                  className="px-4 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg shadow-sm shadow-violet-500/20 transition-all"
                 >
                   Get Started
                 </Link>
@@ -116,7 +115,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center md:hidden">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -126,12 +125,12 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-slate-800 bg-slate-900 px-4 pt-2 pb-4 space-y-2">
+        <div className="md:hidden border-b border-gray-200 bg-white px-4 pt-2 pb-4 space-y-2">
           {isAuthenticated ? (
             <>
-              <div className="px-3 py-2 border-b border-slate-800 mb-2">
-                <div className="text-sm font-medium text-white">{user?.name}</div>
-                <div className="text-xs text-slate-400 truncate">{user?.email}</div>
+              <div className="px-3 py-2 border-b border-gray-100 mb-2">
+                <div className="text-sm font-medium text-gray-900">{user?.name}</div>
+                <div className="text-xs text-gray-500 truncate">{user?.email}</div>
               </div>
               {navLinks.map((link) => {
                 const Icon = link.icon;
@@ -142,8 +141,8 @@ export const Navbar: React.FC = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
                       isActive(link.path)
-                        ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
-                        : 'text-slate-300 hover:bg-slate-800'
+                        ? 'bg-violet-100 text-violet-700 border border-violet-200'
+                        : 'text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -156,7 +155,7 @@ export const Navbar: React.FC = () => {
                   setMobileMenuOpen(false);
                   handleLogout();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-rose-600 hover:bg-rose-50"
               >
                 <LogOut className="w-4 h-4" />
                 Sign out
@@ -167,14 +166,14 @@ export const Navbar: React.FC = () => {
               <Link
                 to="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg"
+                className="block w-full text-center py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg"
               >
                 Sign in
               </Link>
               <Link
                 to="/register"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block w-full text-center py-2.5 text-sm font-medium text-white bg-sky-500 hover:bg-sky-400 rounded-lg"
+                className="block w-full text-center py-2.5 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg"
               >
                 Get Started
               </Link>

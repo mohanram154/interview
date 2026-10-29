@@ -12,11 +12,15 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Loader2, 
+  ArrowLeft,
   ArrowRight,
-  ShieldAlert,
-  Sparkles,
+  Bookmark,
+  BookmarkCheck,
+  Check,
   HelpCircle,
-  RotateCcw
+  Sparkles,
+  ShieldAlert,
+  X
 } from 'lucide-react';
 
 export const InterviewRoomPage: React.FC = () => {
@@ -26,12 +30,17 @@ export const InterviewRoomPage: React.FC = () => {
   const [interview, setInterview] = useState<Interview | null>(null);
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+
+  // Text/Voice mode answer state
   const [answerText, setAnswerText] = useState<string>('');
 
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [completing, setCompleting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Confirmation dialog for submission
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
 
   // Speech Synthesis (Audio Read-Aloud)
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
@@ -42,7 +51,7 @@ export const InterviewRoomPage: React.FC = () => {
   const [speechSupported, setSpeechSupported] = useState<boolean>(true);
   const recognitionRef = useRef<any>(null);
 
-  // Real-time evaluation feedback after submission
+  // Real-time evaluation feedback for Text/Voice modes
   const [lastEvaluation, setLastEvaluation] = useState<any | null>(null);
 
   // 1. Fetch interview details and questions
@@ -56,16 +65,20 @@ export const InterviewRoomPage: React.FC = () => {
         const interviewData = res.data.data;
         setInterview(interviewData);
 
+        if (interviewData.status === 'COMPLETED') {
+          navigate(`/interview/${id}/report`);
+          return;
+        }
+
         const qs = interviewData.questions || [];
         setQuestions(qs);
 
-        // Find first unanswered question
-        const firstUnansweredIndex = qs.findIndex(q => !q.answered);
-        if (firstUnansweredIndex !== -1) {
-          setCurrentIndex(firstUnansweredIndex);
-        } else if (qs.length > 0 && qs.every(q => q.answered)) {
-          // All answered: complete interview
-          handleCompleteInterview();
+        // For non-MCQ, set first unanswered question
+        if (interviewData.mode !== 'MCQ') {
+          const firstUnansweredIndex = qs.findIndex(q => !q.answered);
+          if (firstUnansweredIndex !== -1) {
+            setCurrentIndex(firstUnansweredIndex);
+          }
         }
       }
     } catch (err: any) {
@@ -80,7 +93,6 @@ export const InterviewRoomPage: React.FC = () => {
     fetchInterview();
 
     return () => {
-      // Cleanup audio playback on unmount
       if (hasSpeechSynthesis && window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
       }
@@ -90,7 +102,16 @@ export const InterviewRoomPage: React.FC = () => {
     };
   }, [id]);
 
-  // 2. Setup Web Speech Recognition
+  // Sync answerText when navigating questions in Text/Voice mode
+  useEffect(() => {
+    if (questions[currentIndex]?.answer?.answerText) {
+      setAnswerText(questions[currentIndex].answer?.answerText || '');
+    } else {
+      setAnswerText('');
+    }
+  }, [currentIndex, questions]);
+
+  // 2. Setup Speech Recognition for Voice Mode
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -104,10 +125,7 @@ export const InterviewRoomPage: React.FC = () => {
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
-
+      recognition.onstart = () => setIsListening(true);
       recognition.onresult = (event: any) => {
         let transcript = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -120,24 +138,16 @@ export const InterviewRoomPage: React.FC = () => {
           });
         }
       };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
 
       recognitionRef.current = recognition;
     } catch (e) {
-      console.warn('Speech recognition not available:', e);
       setSpeechSupported(false);
     }
   }, []);
 
-  // 3. Speech Synthesis (Read Aloud)
+  // 3. Speech Synthesis (Read Question Aloud)
   const toggleSpeechSynthesis = (text: string) => {
     if (!hasSpeechSynthesis) return;
 
@@ -177,8 +187,66 @@ export const InterviewRoomPage: React.FC = () => {
     }
   };
 
-  // 5. Submit Answer
-  const handleSubmitAnswer = async () => {
+  // 5. Select MCQ Option and immediately save to backend
+  const handleSelectOption = async (optionKey: 'A' | 'B' | 'C' | 'D') => {
+    const currentQ = questions[currentIndex];
+    if (!currentQ) return;
+
+    // Optimistic UI update
+    const updated = [...questions];
+    updated[currentIndex] = {
+      ...currentQ,
+      selectedOption: optionKey,
+      answered: true,
+      answer: {
+        ...(currentQ.answer || ({} as any)),
+        interviewQuestionId: currentQ.id,
+        selectedOption: optionKey,
+        answerText: `Option ${optionKey}`,
+        answerStatus: 'SUBMITTED',
+        submittedAt: new Date().toISOString(),
+      }
+    };
+    setQuestions(updated);
+
+    try {
+      await apiClient.post<ApiResponse<AnswerResponse>>(
+        `/interviews/${id}/answers`,
+        {
+          interviewQuestionId: currentQ.id,
+          selectedOption: optionKey,
+          markedForReview: currentQ.markedForReview || false,
+        }
+      );
+    } catch (err: any) {
+      console.error('Error saving answer selection:', err);
+    }
+  };
+
+  // 6. Toggle Mark for Review
+  const handleToggleMarkForReview = async () => {
+    const currentQ = questions[currentIndex];
+    if (!currentQ) return;
+
+    const newMarked = !currentQ.markedForReview;
+
+    // Optimistic UI update
+    const updated = [...questions];
+    updated[currentIndex] = {
+      ...currentQ,
+      markedForReview: newMarked,
+    };
+    setQuestions(updated);
+
+    try {
+      await apiClient.put(`/interviews/${id}/questions/${currentQ.id}/review?marked=${newMarked}`);
+    } catch (err: any) {
+      console.error('Error toggling mark for review:', err);
+    }
+  };
+
+  // 7. Submit Text/Voice Answer
+  const handleSubmitTextAnswer = async () => {
     if (!answerText.trim()) {
       setError('Please provide an answer before submitting.');
       return;
@@ -187,7 +255,6 @@ export const InterviewRoomPage: React.FC = () => {
     const currentQuestion = questions[currentIndex];
     if (!currentQuestion) return;
 
-    // Stop recording and speech synthesis if active
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
@@ -213,7 +280,6 @@ export const InterviewRoomPage: React.FC = () => {
         const savedAnswer = res.data.data;
         setLastEvaluation(savedAnswer.evaluation);
 
-        // Update local question state
         const updatedQuestions = [...questions];
         updatedQuestions[currentIndex] = {
           ...currentQuestion,
@@ -223,16 +289,14 @@ export const InterviewRoomPage: React.FC = () => {
         setQuestions(updatedQuestions);
         setAnswerText('');
 
-        // Move to next question or complete
         if (currentIndex + 1 < questions.length) {
           setTimeout(() => {
             setCurrentIndex(currentIndex + 1);
             setLastEvaluation(null);
-          }, 2500); // Allow brief review of feedback
+          }, 2500);
         } else {
-          // All questions answered!
           setTimeout(() => {
-            handleCompleteInterview();
+            handleFinalSubmit();
           }, 2000);
         }
       }
@@ -243,247 +307,497 @@ export const InterviewRoomPage: React.FC = () => {
     }
   };
 
-  // 6. Complete Interview & Generate Report
-  const handleCompleteInterview = async () => {
+  // 8. Final Submit & Report Generation
+  const handleFinalSubmit = async () => {
     setCompleting(true);
+    setShowConfirmModal(false);
     try {
       const res = await apiClient.post<ApiResponse<any>>(`/interviews/${id}/complete`);
       if (res.data.success) {
         navigate(`/interview/${id}/report`);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to finalize interview report.');
-    } finally {
+      setError(err.response?.data?.message || 'Failed to complete interview and generate report.');
       setCompleting(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-[75vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-8 h-8 text-sky-400 animate-spin" />
-        <span className="text-sm text-slate-400">Loading mock interview room...</span>
+      <div className="min-h-[75vh] flex flex-col items-center justify-center gap-3 bg-white">
+        <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
+        <span className="text-sm text-gray-500">Loading interview room...</span>
       </div>
     );
   }
 
   if (completing) {
     return (
-      <div className="min-h-[75vh] flex flex-col items-center justify-center gap-4 text-center px-4">
-        <div className="w-14 h-14 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center">
-          <Sparkles className="w-7 h-7 text-sky-400 animate-bounce" />
+      <div className="min-h-[75vh] flex flex-col items-center justify-center gap-4 text-center px-4 bg-white">
+        <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center shadow-sm">
+          <Sparkles className="w-8 h-8 text-violet-600 animate-pulse" />
         </div>
-        <h2 className="text-xl font-bold text-white">Synthesizing Comprehensive Competency Report...</h2>
-        <p className="text-xs text-slate-400 max-w-sm">
-          Calculating 4D evaluation rubrics, text sentiment indicators, and personalized practice recommendations.
+        <h2 className="text-2xl font-bold text-gray-900">Calculating Objective Scores & Explanations...</h2>
+        <p className="text-sm text-gray-500 max-w-sm">
+          Evaluating answers, compiling topic strengths, and generating your detailed technical report.
         </p>
       </div>
     );
   }
 
   const currentQuestion = questions[currentIndex];
-  const progressPercent = questions.length > 0 ? Math.round(((currentIndex + (currentQuestion?.answered ? 1 : 0)) / questions.length) * 100) : 0;
-  const isVoiceMode = interview?.mode === 'VOICE';
+  const isMcq = interview?.mode === 'MCQ' || currentQuestion?.questionType === 'MCQ';
+  const totalQuestions = questions.length;
+  const answeredCount = questions.filter(q => q.answered || (q.selectedOption && q.selectedOption.trim().length > 0)).length;
+  const markedCount = questions.filter(q => q.markedForReview).length;
+  const unansweredCount = totalQuestions - answeredCount;
+  const progressPercent = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6 bg-white min-h-[calc(100vh-8rem)]">
       {/* Top Session Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-gray-200 gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-lg text-white">{interview?.jobRoleName}</span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+            <span className="font-extrabold text-xl text-gray-900">{interview?.jobRoleName}</span>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-violet-100 text-violet-700 border border-violet-200">
               {interview?.difficulty}
             </span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              {interview?.mode} MODE
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-violet-50 text-violet-800 border border-violet-300">
+              {interview?.mode} Round
             </span>
           </div>
-          <div className="text-xs text-slate-400 mt-1">
-            Question {currentIndex + 1} of {questions.length} • Category: {currentQuestion?.category}
+          <div className="text-xs text-gray-500 mt-1 font-medium">
+            Question {currentIndex + 1} of {totalQuestions} • Domain: {currentQuestion?.category || 'Technical'}
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            if (confirm('Are you sure you want to exit? You can resume this session anytime from your dashboard.')) {
-              navigate('/dashboard');
-            }
-          }}
-          className="text-xs font-medium text-slate-400 hover:text-red-400 px-3 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 transition-colors"
-        >
-          Exit Session
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              if (confirm('Are you sure you want to pause and exit? You can resume this session anytime from your dashboard.')) {
+                navigate('/dashboard');
+              }
+            }}
+            className="text-xs font-semibold text-gray-600 hover:text-gray-900 px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            Save & Exit
+          </button>
+
+          {isMcq && (
+            <button
+              onClick={() => setShowConfirmModal(true)}
+              className="text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 px-4 py-2 rounded-xl shadow-xs shadow-violet-500/20 transition-all flex items-center gap-1.5"
+            >
+              <span>Submit Interview</span>
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Progress Bar */}
       <div className="space-y-1.5">
-        <div className="flex justify-between text-xs text-slate-400">
-          <span>Interview Progress</span>
-          <span>{progressPercent}% Complete</span>
+        <div className="flex justify-between text-xs font-medium text-gray-600">
+          <span>Overall Progress ({answeredCount}/{totalQuestions} Answered)</span>
+          <span className="text-violet-700 font-bold">{progressPercent}%</span>
         </div>
-        <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+        <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all duration-300" 
+            className="h-full bg-violet-600 transition-all duration-300 rounded-full" 
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Question Card */}
-      {currentQuestion && (
-        <div className="p-6 sm:p-8 rounded-2xl bg-slate-800/60 border border-slate-700/80 shadow-xl space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-sky-400">
-              <span className="w-6 h-6 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-                Q{currentIndex + 1}
-              </span>
-              <span>{currentQuestion.category}</span>
-            </div>
+      {/* Main Grid: Question Area (left) + Question Navigation Palette (right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        {/* Left Column: Active Question Workspace */}
+        <div className="lg:col-span-3 space-y-6">
+          {currentQuestion && (
+            <div className="p-6 sm:p-8 rounded-2xl bg-white border border-gray-200 shadow-xs space-y-6">
+              {/* Question Header */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold border border-violet-200">
+                    Question {currentIndex + 1} of {totalQuestions}
+                  </span>
+                  <span className="text-xs font-medium text-gray-500">
+                    {currentQuestion.category}
+                  </span>
+                </div>
 
-            {/* Read Aloud Button */}
-            {hasSpeechSynthesis && (
-              <button
-                onClick={() => toggleSpeechSynthesis(currentQuestion.questionText)}
-                className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  isSpeaking
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
-                    : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700 border border-slate-600'
-                }`}
-                title={isSpeaking ? 'Stop read-aloud' : 'Read question aloud'}
-              >
-                {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                <span className="hidden sm:inline">{isSpeaking ? 'Stop Audio' : 'Read Aloud'}</span>
-              </button>
-            )}
-          </div>
+                <div className="flex items-center gap-2">
+                  {/* Mark for Review Button */}
+                  {isMcq && (
+                    <button
+                      type="button"
+                      onClick={handleToggleMarkForReview}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                        currentQuestion.markedForReview
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                      }`}
+                    >
+                      {currentQuestion.markedForReview ? (
+                        <>
+                          <BookmarkCheck className="w-4 h-4 text-amber-600" />
+                          <span>Marked for Review</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="w-4 h-4 text-gray-400" />
+                          <span>Mark for Review</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
-          <h3 className="text-lg sm:text-xl font-semibold text-white leading-relaxed">
-            {currentQuestion.questionText}
-          </h3>
-        </div>
-      )}
+                  {/* Read Aloud Button */}
+                  {hasSpeechSynthesis && (
+                    <button
+                      onClick={() => toggleSpeechSynthesis(currentQuestion.questionText)}
+                      className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                        isSpeaking
+                          ? 'bg-violet-100 text-violet-700 border border-violet-300 animate-pulse'
+                          : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                      }`}
+                      title={isSpeaking ? 'Stop read-aloud' : 'Read question aloud'}
+                    >
+                      {isSpeaking ? <VolumeX className="w-4 h-4 text-violet-600" /> : <Volume2 className="w-4 h-4 text-gray-500" />}
+                    </button>
+                  )}
+                </div>
+              </div>
 
-      {/* Answer Workspace */}
-      <div className="space-y-4">
-        {/* Voice Controls Bar if Voice Mode */}
-        {isVoiceMode && (
-          <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={toggleVoiceRecording}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition-all ${
-                  isListening
-                    ? 'bg-rose-500 text-white animate-pulse shadow-rose-500/30'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
-                }`}
-              >
-                {isListening ? (
-                  <>
-                    <MicOff className="w-4 h-4" />
-                    <span>Stop Microphone</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-4 h-4" />
-                    <span>Start Speaking</span>
-                  </>
-                )}
-              </button>
+              {/* Question Text */}
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-relaxed">
+                {currentQuestion.questionText}
+              </h2>
 
-              {isListening && (
-                <div className="flex items-center gap-2 text-xs text-rose-400 font-medium">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                  <span>Listening & transcribing...</span>
+              {/* MCQ Options Rendering */}
+              {isMcq && (
+                <div className="space-y-3 pt-2">
+                  {(['A', 'B', 'C', 'D'] as const).map((optKey) => {
+                    const optText = 
+                      optKey === 'A' ? currentQuestion.optionA :
+                      optKey === 'B' ? currentQuestion.optionB :
+                      optKey === 'C' ? currentQuestion.optionC :
+                      currentQuestion.optionD;
+
+                    if (!optText) return null;
+
+                    const isSelected = currentQuestion.selectedOption === optKey;
+
+                    return (
+                      <button
+                        type="button"
+                        key={optKey}
+                        onClick={() => handleSelectOption(optKey)}
+                        className={`w-full p-4 rounded-xl text-left border flex items-center gap-4 transition-all ${
+                          isSelected
+                            ? 'bg-violet-50 border-violet-600 text-gray-900 shadow-xs ring-2 ring-violet-600/30'
+                            : 'bg-white border-gray-200 text-gray-800 hover:border-gray-300 hover:bg-gray-50/70'
+                        }`}
+                      >
+                        {/* Option Letter Circle */}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-violet-600 text-white'
+                            : 'bg-violet-100 text-violet-700'
+                        }`}>
+                          {optKey}
+                        </div>
+
+                        {/* Option Text */}
+                        <div className="text-sm font-medium flex-1 leading-snug">
+                          {optText}
+                        </div>
+
+                        {/* Check Indicator */}
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-violet-600 flex items-center justify-center text-white shrink-0">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
+
+              {/* Non-MCQ: Text or Voice Workspace */}
+              {!isMcq && (
+                <div className="space-y-4 pt-2">
+                  {interview?.mode === 'VOICE' && (
+                    <div className="p-4 rounded-2xl bg-violet-50 border border-violet-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={toggleVoiceRecording}
+                          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-all ${
+                            isListening
+                              ? 'bg-rose-600 text-white animate-pulse'
+                              : 'bg-violet-600 hover:bg-violet-700 text-white'
+                          }`}
+                        >
+                          {isListening ? (
+                            <>
+                              <MicOff className="w-4 h-4" />
+                              <span>Stop Microphone</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mic className="w-4 h-4" />
+                              <span>Start Speaking</span>
+                            </>
+                          )}
+                        </button>
+                        {isListening && (
+                          <div className="flex items-center gap-2 text-xs text-rose-600 font-semibold">
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                            <span>Listening & transcribing...</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-gray-500">
+                        Speech recognized is editable below before submitting.
+                      </div>
+                    </div>
+                  )}
+
+                  <textarea
+                    rows={6}
+                    value={answerText}
+                    onChange={(e) => setAnswerText(e.target.value)}
+                    disabled={submitting}
+                    placeholder="Type your structured technical explanation here..."
+                    className="w-full p-4 bg-white border border-gray-300 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-600 focus:border-violet-600 leading-relaxed transition-all resize-y"
+                  />
+
+                  {lastEvaluation && (
+                    <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs space-y-2">
+                      <div className="flex items-center justify-between text-emerald-800 font-bold">
+                        <span className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>AI Evaluation Score: {lastEvaluation.overallScore}/100</span>
+                        </span>
+                      </div>
+                      <p className="text-gray-700 leading-relaxed">{lastEvaluation.feedback}</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSubmitTextAnswer}
+                      disabled={submitting || !answerText.trim()}
+                      className="px-6 py-2.5 rounded-xl font-semibold text-sm text-white bg-violet-600 hover:bg-violet-700 shadow-sm shadow-violet-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Evaluating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Submit Answer</span>
+                          <Send className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Navigation Controls (Previous / Next) */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  disabled={currentIndex === 0}
+                  onClick={() => setCurrentIndex(currentIndex - 1)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-100 border border-gray-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </button>
+
+                <div className="text-xs text-gray-500 font-medium">
+                  {currentQuestion.selectedOption ? (
+                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Option {currentQuestion.selectedOption} Saved
+                    </span>
+                  ) : (
+                    <span>Not answered yet</span>
+                  )}
+                </div>
+
+                {currentIndex + 1 < totalQuestions ? (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentIndex(currentIndex + 1)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 shadow-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <span>Next</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmModal(true)}
+                    className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <span>Finish Interview</span>
+                    <Check className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
-
-            <div className="text-[11px] text-slate-400">
-              Transcript is editable below before submitting.
-            </div>
-          </div>
-        )}
-
-        {/* Text Area */}
-        <div className="relative">
-          <textarea
-            rows={7}
-            value={answerText}
-            onChange={(e) => setAnswerText(e.target.value)}
-            disabled={submitting}
-            placeholder={
-              isVoiceMode
-                ? "Click 'Start Speaking' above to speak your answer, or type directly here. You can refine your answer before submission."
-                : "Type your structured technical explanation here. Include key concepts, APIs, and architectural trade-offs..."
-            }
-            className="w-full p-4 bg-slate-800/70 border border-slate-700 rounded-2xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 leading-relaxed transition-all resize-y"
-          />
-
-          <div className="flex justify-between items-center text-xs text-slate-400 mt-2 px-1">
-            <span>
-              {answerText.trim() ? `${answerText.trim().split(/\s+/).length} words` : '0 words'} •{' '}
-              {answerText.length} characters
-            </span>
-            <span>Focus on technical accuracy & clarity</span>
-          </div>
+          )}
         </div>
 
-        {/* Real-time Answer Feedback Card if just submitted */}
-        {lastEvaluation && (
-          <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-xs space-y-2 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between text-emerald-400 font-bold">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>AI Evaluation: {lastEvaluation.overallScore}/100</span>
-              </span>
-              <span className="text-[11px] font-mono text-slate-400">
-                Technical: {lastEvaluation.technicalAccuracyScore}/100 • Clarity: {lastEvaluation.clarityScore}/100
+        {/* Right Column: Question Navigation Palette */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="p-5 rounded-2xl bg-white border border-gray-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm text-gray-900">Question Palette</h3>
+              <span className="text-xs font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded">
+                {answeredCount}/{totalQuestions}
               </span>
             </div>
-            <p className="text-slate-300 leading-relaxed">
-              {lastEvaluation.feedback}
-            </p>
-            <div className="text-slate-400 text-[11px] pt-1 border-t border-slate-800">
-              Next question loading automatically...
+
+            {/* Grid of question buttons */}
+            <div className="grid grid-cols-5 gap-2">
+              {questions.map((q, idx) => {
+                const isCurrent = idx === currentIndex;
+                const isAnswered = q.answered || (q.selectedOption && q.selectedOption.trim().length > 0);
+                const isMarked = q.markedForReview;
+
+                let btnClass = 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50';
+                if (isAnswered) {
+                  btnClass = 'bg-violet-600 text-white border-violet-600 font-bold';
+                }
+                if (isMarked) {
+                  btnClass = 'bg-amber-100 text-amber-900 border-amber-300 font-bold ring-1 ring-amber-400';
+                }
+                if (isCurrent) {
+                  btnClass += ' ring-2 ring-violet-600 ring-offset-2';
+                }
+
+                return (
+                  <button
+                    type="button"
+                    key={q.id || idx}
+                    onClick={() => setCurrentIndex(idx)}
+                    className={`relative h-10 rounded-xl text-xs font-semibold border flex items-center justify-center transition-all ${btnClass}`}
+                    title={`Question ${idx + 1}: ${isAnswered ? 'Answered' : 'Unanswered'}${isMarked ? ' (Marked for Review)' : ''}`}
+                  >
+                    <span>{idx + 1}</span>
+                    {isMarked && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border border-white" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Legend */}
+            <div className="pt-4 border-t border-gray-100 space-y-2 text-[11px] text-gray-600 font-medium">
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded bg-violet-600 shrink-0" />
+                <span>Answered ({answeredCount})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded bg-white border border-gray-300 shrink-0" />
+                <span>Unanswered ({unansweredCount})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-400 shrink-0" />
+                <span>Marked for Review ({markedCount})</span>
+              </div>
+            </div>
+
+            {/* Submit Action */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(true)}
+                className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 shadow-xs flex items-center justify-center gap-1.5 transition-all"
+              >
+                <span>Submit & View Report</span>
+              </button>
             </div>
           </div>
-        )}
-
-        {/* Submit Action */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-xs text-slate-500 flex items-center gap-1.5">
-            <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
-            <span>Answers saved persistently to MySQL.</span>
-          </div>
-
-          <button
-            onClick={handleSubmitAnswer}
-            disabled={submitting || !answerText.trim()}
-            className="px-6 py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-lg shadow-sky-500/25 flex items-center gap-2 transition-all disabled:opacity-50"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Evaluating Answer...</span>
-              </>
-            ) : (
-              <>
-                <span>Submit Answer</span>
-                <Send className="w-4 h-4" />
-              </>
-            )}
-          </button>
         </div>
       </div>
+
+      {/* Submit Confirmation Dialog Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-2xl p-6 sm:p-7 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Confirm Final Submission</h3>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Are you sure you want to finalize and submit your interview? Once submitted, your answers will be evaluated on the backend and your score and verified explanations will be revealed.
+            </p>
+
+            {/* Status Breakdown */}
+            <div className="grid grid-cols-3 gap-2.5 text-center">
+              <div className="p-3 rounded-xl bg-violet-50 border border-violet-100">
+                <div className="text-xl font-bold text-violet-700">{answeredCount}</div>
+                <div className="text-[11px] font-medium text-gray-600 mt-0.5">Answered</div>
+              </div>
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-200">
+                <div className="text-xl font-bold text-gray-700">{unansweredCount}</div>
+                <div className="text-[11px] font-medium text-gray-600 mt-0.5">Unanswered</div>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                <div className="text-xl font-bold text-amber-700">{markedCount}</div>
+                <div className="text-[11px] font-medium text-gray-600 mt-0.5">For Review</div>
+              </div>
+            </div>
+
+            {unansweredCount > 0 && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>You have <strong>{unansweredCount}</strong> unanswered question(s). Unanswered questions receive 0 marks.</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors"
+              >
+                Keep Practicing
+              </button>
+              <button
+                type="button"
+                onClick={handleFinalSubmit}
+                className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 shadow-sm shadow-violet-500/20 transition-all flex items-center gap-1.5"
+              >
+                <span>Confirm & Submit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

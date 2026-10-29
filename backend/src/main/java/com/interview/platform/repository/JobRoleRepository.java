@@ -12,3 +12,4 @@ public interface JobRoleRepository extends JpaRepository<JobRole, Long> {
     List<JobRole> findByActiveTrue();
     Optional<JobRole> findByNameIgnoreCase(String name);
 }
+

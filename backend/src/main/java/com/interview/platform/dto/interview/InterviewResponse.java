@@ -55,3 +55,4 @@ public class InterviewResponse {
     public List<InterviewQuestionResponse> getQuestions() { return questions; }
     public void setQuestions(List<InterviewQuestionResponse> questions) { this.questions = questions; }
 }
+

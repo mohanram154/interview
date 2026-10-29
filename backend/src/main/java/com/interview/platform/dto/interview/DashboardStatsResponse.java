@@ -29,3 +29,4 @@ public class DashboardStatsResponse {
     public List<InterviewResponse> getRecentInterviews() { return recentInterviews; }
     public void setRecentInterviews(List<InterviewResponse> recentInterviews) { this.recentInterviews = recentInterviews; }
 }
+

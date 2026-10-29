@@ -10,3 +10,4 @@ import java.util.Optional;
 public interface EvaluationRepository extends JpaRepository<Evaluation, Long> {
     Optional<Evaluation> findByAnswerId(Long answerId);
 }
+

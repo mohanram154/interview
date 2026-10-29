@@ -43,3 +43,4 @@ class SentimentResponse(BaseModel):
         "Text sentiment analysis evaluates linguistic structure and vocabulary only. "
         "It does not evaluate technical proficiency, integrity, confidence, or candidate job suitability."
     )
+

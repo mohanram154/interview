@@ -60,9 +60,9 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
             cancel_on_tap_outside: true,
           });
 
-          // Render official Google button
+          // Render official Google button with official brand styling
           window.google.accounts.id.renderButton(buttonRef.current, {
-            theme: 'filled_black',
+            theme: 'outline',
             size: 'large',
             type: 'standard',
             shape: 'rectangular',
@@ -84,16 +84,16 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 
   if (!isClientConfigured) {
     return (
-      <div className="w-full p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs text-slate-300">
-        <div className="flex items-center gap-2 text-sky-400 font-semibold mb-1">
-          <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0" />
+      <div className="w-full p-3.5 rounded-xl bg-violet-50/80 border border-violet-200 text-xs text-gray-700">
+        <div className="flex items-center gap-2 text-violet-700 font-semibold mb-1">
+          <CheckCircle2 className="w-4 h-4 text-violet-600 shrink-0" />
           <span>Official Google OAuth Ready</span>
         </div>
-        <p className="text-slate-400 text-[11px] leading-relaxed mb-1.5">
+        <p className="text-gray-600 text-[11px] leading-relaxed mb-1.5">
           Backend token verification and Google Identity Services are fully implemented.
         </p>
-        <p className="text-slate-400 text-[11px] leading-relaxed">
-          To connect your live OAuth client, add your Client ID to <code className="text-sky-300 font-mono">VITE_GOOGLE_CLIENT_ID</code> in <code className="text-sky-300 font-mono">.env</code>. You can also sign in or register below using email/password.
+        <p className="text-gray-500 text-[11px] leading-relaxed">
+          To connect your live OAuth client, add your Client ID to <code className="text-violet-700 font-mono font-medium">VITE_GOOGLE_CLIENT_ID</code> in <code className="text-violet-700 font-mono font-medium">.env</code>. You can also sign in or register below using email/password.
         </p>
       </div>
     );
@@ -102,7 +102,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   return (
     <div className="w-full flex flex-col items-center">
       {errorMessage && (
-        <div className="w-full mb-3 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+        <div className="w-full mb-3 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMessage}</span>
         </div>

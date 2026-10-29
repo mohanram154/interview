@@ -22,3 +22,4 @@ app:
     timeout-ms: 5000
   cors:
     allowed-origins: http://localhost:5173
+

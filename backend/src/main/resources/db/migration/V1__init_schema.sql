@@ -123,3 +123,4 @@ CREATE TABLE IF NOT EXISTS interview_reports (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_reports_interview FOREIGN KEY (interview_id) REFERENCES interviews (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
