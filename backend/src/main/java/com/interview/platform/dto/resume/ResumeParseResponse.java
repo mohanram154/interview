@@ -30,3 +30,4 @@ public class ResumeParseResponse {
     public Map<String, Object> getExtractedData() { return extractedData; }
     public void setExtractedData(Map<String, Object> extractedData) { this.extractedData = extractedData; }
 }
+

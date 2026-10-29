@@ -108,9 +108,10 @@ public class AssessmentSessionController {
     @PostMapping("/{id}/mcq/start")
     public ResponseEntity<ApiResponse<InterviewResponse>> startOrResumeMcqRound(
             @PathVariable Long id,
+            @RequestParam(required = false) Integer questionCount,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        InterviewResponse response = assessmentSessionService.startOrResumeMcqRound(id, principal.getId());
+        InterviewResponse response = assessmentSessionService.startOrResumeMcqRound(id, principal.getId(), questionCount);
         return ResponseEntity.ok(ApiResponse.success("MCQ Technical Assessment initialized or resumed", response));
     }
 

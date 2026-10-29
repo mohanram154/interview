@@ -58,3 +58,4 @@ VALUES
     (8, 'Data Analyst', 'Data wrangling, SQL querying, statistical data analysis, Python/Pandas, visualization, and business intelligence.', TRUE),
     (9, 'AI/ML Engineer', 'Machine learning algorithms, model training, feature engineering, neural networks, PyTorch/TensorFlow, and model deployment.', TRUE)
 ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description), active=VALUES(active);
+

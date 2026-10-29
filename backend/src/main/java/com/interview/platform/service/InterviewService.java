@@ -59,43 +59,64 @@ public class InterviewService {
         JobRole jobRole = jobRoleRepository.findById(request.getJobRoleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Job role not found with ID: " + request.getJobRoleId()));
 
-        String difficulty = request.getDifficulty() != null ? request.getDifficulty().toUpperCase() : "INTERMEDIATE";
+        String rawDiff = request.getDifficulty() != null ? request.getDifficulty().trim().toUpperCase() : "INTERMEDIATE";
+        String difficulty = switch (rawDiff) {
+            case "EASY" -> "BEGINNER";
+            case "MEDIUM" -> "INTERMEDIATE";
+            case "HARD" -> "ADVANCED";
+            default -> rawDiff;
+        };
         String mode = request.getMode() != null ? request.getMode().toUpperCase() : "MCQ";
         int requestedCount = request.getQuestionCount() > 0 ? request.getQuestionCount() : 20;
         int questionCount = Math.max(1, Math.min(25, requestedCount));
 
+        Set<Long> seenIds = new LinkedHashSet<>();
         List<Question> selectedQuestions = new ArrayList<>();
 
         if ("MCQ".equalsIgnoreCase(mode)) {
-            // Prioritize questions matching selected difficulty
+            // 1. Prioritize questions matching selected difficulty for this role
             List<Question> diffQuestions = new ArrayList<>(
                     questionRepository.findByJobRoleIdAndDifficultyIgnoreCaseAndQuestionTypeAndActiveTrue(jobRole.getId(), difficulty, "MCQ")
             );
+            if (diffQuestions.isEmpty() && !rawDiff.equalsIgnoreCase(difficulty)) {
+                diffQuestions = questionRepository.findByJobRoleIdAndDifficultyIgnoreCaseAndQuestionTypeAndActiveTrue(jobRole.getId(), rawDiff, "MCQ");
+            }
             Collections.shuffle(diffQuestions);
-            selectedQuestions.addAll(diffQuestions);
+            for (Question q : diffQuestions) {
+                if (seenIds.add(q.getId())) {
+                    selectedQuestions.add(q);
+                }
+                if (selectedQuestions.size() >= questionCount) break;
+            }
 
-            // If we need more to reach requested count, pull from other difficulties of the same role
+            // 2. If we need more to reach requested count, pull from other difficulties of the same role
             if (selectedQuestions.size() < questionCount) {
                 List<Question> roleQuestions = new ArrayList<>(
                         questionRepository.findByJobRoleIdAndQuestionTypeAndActiveTrue(jobRole.getId(), "MCQ")
                 );
                 Collections.shuffle(roleQuestions);
                 for (Question q : roleQuestions) {
-                    if (!selectedQuestions.contains(q)) {
+                    if (seenIds.add(q.getId())) {
                         selectedQuestions.add(q);
                     }
                     if (selectedQuestions.size() >= questionCount) break;
                 }
             }
 
-            // Fallback to any active questions if still empty
+            // 3. Fallback to any active questions if still empty
             if (selectedQuestions.isEmpty()) {
-                selectedQuestions.addAll(questionRepository.findByJobRoleIdAndActiveTrue(jobRole.getId()));
-                Collections.shuffle(selectedQuestions);
+                List<Question> anyQuestions = new ArrayList<>(questionRepository.findByJobRoleIdAndActiveTrue(jobRole.getId()));
+                Collections.shuffle(anyQuestions);
+                for (Question q : anyQuestions) {
+                    if (seenIds.add(q.getId())) {
+                        selectedQuestions.add(q);
+                    }
+                    if (selectedQuestions.size() >= questionCount) break;
+                }
             }
 
             if (selectedQuestions.size() > questionCount) {
-                selectedQuestions = selectedQuestions.subList(0, questionCount);
+                selectedQuestions = new ArrayList<>(selectedQuestions.subList(0, questionCount));
             }
         } else {
             // Non-MCQ modes (TEXT, VOICE)

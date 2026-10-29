@@ -321,3 +321,4 @@ def evaluate_resume(
         "companyName": company_name or "Standard Industry Profile",
         "hasCustomJobDescription": has_custom_jd
     }
+

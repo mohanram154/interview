@@ -22,6 +22,9 @@ public class AssessmentSession {
     @Column(nullable = false, length = 50)
     private String difficulty = "INTERMEDIATE";
 
+    @Column(name = "question_count", nullable = false)
+    private Integer questionCount = 20;
+
     @Column(name = "current_stage", nullable = false, length = 50)
     private String currentStage = "RESUME_EVALUATION";
 
@@ -192,6 +195,9 @@ public class AssessmentSession {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Integer getQuestionCount() { return questionCount != null ? questionCount : 20; }
+    public void setQuestionCount(Integer questionCount) { this.questionCount = questionCount; }
 
     public LocalDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }

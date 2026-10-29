@@ -35,3 +35,4 @@ public class SubmitResumeEvaluationRequest {
     public Map<String, Double> getCustomWeights() { return customWeights; }
     public void setCustomWeights(Map<String, Double> customWeights) { this.customWeights = customWeights; }
 }
+

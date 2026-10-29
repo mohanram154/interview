@@ -124,3 +124,4 @@ public class ResumeEvaluationResponse {
     public LocalDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
 }
+

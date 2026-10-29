@@ -16,6 +16,7 @@ import com.interview.platform.repository.AssessmentSessionRepository;
 import com.interview.platform.repository.InterviewReportRepository;
 import com.interview.platform.repository.InterviewRepository;
 import com.interview.platform.repository.JobRoleRepository;
+import com.interview.platform.repository.ResumeEvaluationRepository;
 import com.interview.platform.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class AssessmentSessionService {
     private final InterviewRepository interviewRepository;
     private final InterviewReportRepository interviewReportRepository;
     private final InterviewService interviewService;
+    private final ResumeEvaluationRepository resumeEvaluationRepository;
 
     public AssessmentSessionService(
             AssessmentSessionRepository assessmentSessionRepository,
@@ -40,7 +42,8 @@ public class AssessmentSessionService {
             JobRoleRepository jobRoleRepository,
             InterviewRepository interviewRepository,
             InterviewReportRepository interviewReportRepository,
-            InterviewService interviewService
+            InterviewService interviewService,
+            ResumeEvaluationRepository resumeEvaluationRepository
     ) {
         this.assessmentSessionRepository = assessmentSessionRepository;
         this.userRepository = userRepository;
@@ -48,6 +51,7 @@ public class AssessmentSessionService {
         this.interviewRepository = interviewRepository;
         this.interviewReportRepository = interviewReportRepository;
         this.interviewService = interviewService;
+        this.resumeEvaluationRepository = resumeEvaluationRepository;
     }
 
     @Transactional
@@ -59,11 +63,13 @@ public class AssessmentSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job role not found with ID: " + request.getJobRoleId()));
 
         String difficulty = request.getDifficulty() != null ? request.getDifficulty().toUpperCase() : "INTERMEDIATE";
+        int questionCount = (request.getQuestionCount() != null && request.getQuestionCount() == 15) ? 15 : 20;
 
         AssessmentSession session = new AssessmentSession();
         session.setUser(user);
         session.setJobRole(jobRole);
         session.setDifficulty(difficulty);
+        session.setQuestionCount(questionCount);
         session.setCurrentStage("RESUME_EVALUATION");
         session.setSessionStatus("IN_PROGRESS");
 
@@ -117,7 +123,9 @@ public class AssessmentSessionService {
                 break;
 
             case "MCQ_ASSESSMENT":
-                if (!"COMPLETED".equalsIgnoreCase(session.getResumeStageStatus()) || session.getResumeScore() == null) {
+                if (!"COMPLETED".equalsIgnoreCase(session.getResumeStageStatus()) 
+                        || session.getResumeScore() == null
+                        || resumeEvaluationRepository.findByAssessmentSessionId(session.getId()).isEmpty()) {
                     throw new BadRequestException("Complete Resume Evaluation to unlock this round.");
                 }
                 break;
@@ -209,6 +217,11 @@ public class AssessmentSessionService {
      */
     @Transactional
     public InterviewResponse startOrResumeMcqRound(Long sessionId, Long userId) {
+        return startOrResumeMcqRound(sessionId, userId, null);
+    }
+
+    @Transactional
+    public InterviewResponse startOrResumeMcqRound(Long sessionId, Long userId, Integer requestedQuestionCount) {
         AssessmentSession session = getSessionEntity(sessionId, userId);
 
         // Enforce prerequisite check
@@ -216,12 +229,17 @@ public class AssessmentSessionService {
 
         Interview mcqInterview = session.getMcqInterview();
         if (mcqInterview == null) {
-            // Initialize 20-question MCQ interview session
+            int count = (requestedQuestionCount != null && (requestedQuestionCount == 15 || requestedQuestionCount == 20))
+                    ? requestedQuestionCount
+                    : (session.getQuestionCount() != null && session.getQuestionCount() == 15 ? 15 : 20);
+            session.setQuestionCount(count);
+
+            // Initialize MCQ interview session
             CreateInterviewRequest req = new CreateInterviewRequest();
             req.setJobRoleId(session.getJobRole().getId());
             req.setDifficulty(session.getDifficulty());
             req.setMode("MCQ");
-            req.setQuestionCount(20);
+            req.setQuestionCount(count);
 
             InterviewResponse interviewResp = interviewService.createInterview(userId, req);
             mcqInterview = interviewRepository.findById(interviewResp.getId())
@@ -259,6 +277,11 @@ public class AssessmentSessionService {
 
         // Validate prerequisite
         validateStageAccess(session, "MCQ_ASSESSMENT");
+
+        // Prevent duplicate submissions from corrupting state
+        if ("COMPLETED".equalsIgnoreCase(session.getMcqStageStatus()) && session.getMcqScore() != null) {
+            return mapToResponse(session);
+        }
 
         Interview interview = null;
         if (mcqInterviewId != null) {
@@ -388,6 +411,7 @@ public class AssessmentSessionService {
         resp.setJobRoleId(session.getJobRole().getId());
         resp.setJobRoleName(session.getJobRole().getName());
         resp.setDifficulty(session.getDifficulty());
+        resp.setQuestionCount(session.getQuestionCount());
         resp.setCurrentStage(session.getCurrentStage());
         resp.setSessionStatus(session.getSessionStatus());
 

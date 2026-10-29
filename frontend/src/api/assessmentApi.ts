@@ -103,8 +103,11 @@ export const assessmentApi = {
     return res.data.data;
   },
 
-  startOrResumeMcqRound: async (sessionId: number | string): Promise<any> => {
-    const res = await apiClient.post<{ data: any }>(`/assessment-sessions/${sessionId}/mcq/start`);
+  startOrResumeMcqRound: async (sessionId: number | string, questionCount?: number): Promise<any> => {
+    const url = questionCount
+      ? `/assessment-sessions/${sessionId}/mcq/start?questionCount=${questionCount}`
+      : `/assessment-sessions/${sessionId}/mcq/start`;
+    const res = await apiClient.post<{ data: any }>(url);
     return res.data.data;
   },
 

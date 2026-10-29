@@ -44,7 +44,8 @@ export const InterviewSetupPage: React.FC = () => {
     try {
       const res = await assessmentApi.createSession({
         jobRoleId: selectedRoleId,
-        difficulty
+        difficulty,
+        questionCount: questionCount || 20
       });
       navigate(`/assessment/${res.id}`);
     } catch (err: any) {

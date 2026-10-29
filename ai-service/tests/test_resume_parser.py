@@ -141,3 +141,4 @@ def test_empty_or_corrupt_file_handling():
 
     with pytest.raises(EmptyOrCorruptFileError):
         extract_text_from_pdf(b"not a valid pdf header")
+

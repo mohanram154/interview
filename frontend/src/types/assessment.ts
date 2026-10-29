@@ -32,6 +32,7 @@ export interface AssessmentSession {
   jobRoleId: number;
   jobRoleName: string;
   difficulty: string;
+  questionCount?: number;
   currentStage: AssessmentStage;
   sessionStatus: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
 
@@ -81,6 +82,7 @@ export interface AssessmentSession {
 export interface CreateAssessmentSessionPayload {
   jobRoleId: number;
   difficulty?: string;
+  questionCount?: number;
 }
 
 export interface ContactDetails {

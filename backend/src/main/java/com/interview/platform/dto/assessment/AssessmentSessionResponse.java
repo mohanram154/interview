@@ -9,6 +9,7 @@ public class AssessmentSessionResponse {
     private Long jobRoleId;
     private String jobRoleName;
     private String difficulty;
+    private Integer questionCount;
     private String currentStage;
     private String sessionStatus;
 
@@ -110,6 +111,9 @@ public class AssessmentSessionResponse {
 
     public String getDifficulty() { return difficulty; }
     public void setDifficulty(String difficulty) { this.difficulty = difficulty; }
+
+    public Integer getQuestionCount() { return questionCount; }
+    public void setQuestionCount(Integer questionCount) { this.questionCount = questionCount; }
 
     public String getCurrentStage() { return currentStage; }
     public void setCurrentStage(String currentStage) { this.currentStage = currentStage; }

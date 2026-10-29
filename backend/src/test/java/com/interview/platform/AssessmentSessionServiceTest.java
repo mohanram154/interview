@@ -2,21 +2,18 @@ package com.interview.platform;
 
 import com.interview.platform.dto.assessment.AssessmentSessionResponse;
 import com.interview.platform.dto.assessment.CreateAssessmentSessionRequest;
-import com.interview.platform.entity.AssessmentSession;
-import com.interview.platform.entity.JobRole;
-import com.interview.platform.entity.User;
+import com.interview.platform.dto.interview.CreateInterviewRequest;
+import com.interview.platform.dto.interview.InterviewResponse;
+import com.interview.platform.entity.*;
 import com.interview.platform.exception.BadRequestException;
 import com.interview.platform.exception.UnauthorizedAccessException;
-import com.interview.platform.repository.AssessmentSessionRepository;
-import com.interview.platform.repository.InterviewReportRepository;
-import com.interview.platform.repository.InterviewRepository;
-import com.interview.platform.repository.JobRoleRepository;
-import com.interview.platform.repository.UserRepository;
+import com.interview.platform.repository.*;
 import com.interview.platform.service.AssessmentSessionService;
 import com.interview.platform.service.InterviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -35,6 +32,7 @@ class AssessmentSessionServiceTest {
     @Mock private InterviewRepository interviewRepository;
     @Mock private InterviewReportRepository interviewReportRepository;
     @Mock private InterviewService interviewService;
+    @Mock private ResumeEvaluationRepository resumeEvaluationRepository;
 
     private AssessmentSessionService assessmentSessionService;
 
@@ -46,7 +44,8 @@ class AssessmentSessionServiceTest {
                 jobRoleRepository,
                 interviewRepository,
                 interviewReportRepository,
-                interviewService
+                interviewService,
+                resumeEvaluationRepository
         );
     }
 
@@ -169,6 +168,7 @@ class AssessmentSessionServiceTest {
         session.setVideoStageStatus("LOCKED");
 
         when(assessmentSessionRepository.findById(100L)).thenReturn(Optional.of(session));
+        when(resumeEvaluationRepository.findByAssessmentSessionId(100L)).thenReturn(Optional.of(new ResumeEvaluation()));
         when(assessmentSessionRepository.save(any(AssessmentSession.class))).thenAnswer(i -> i.getArgument(0));
 
         AssessmentSessionResponse resp = assessmentSessionService.completeMcqStage(100L, 10L, null, 90.0);
@@ -232,6 +232,135 @@ class AssessmentSessionServiceTest {
         assertThrows(UnauthorizedAccessException.class, () ->
                 assessmentSessionService.getSessionById(100L, 99L)
         );
+    }
+
+    @Test
+    void testStartOrResumeMcqRoundWith15Questions() {
+        User user = new User("Alice", "alice@example.com", "pass", "LOCAL", "ROLE_CANDIDATE");
+        user.setId(10L);
+
+        JobRole role = new JobRole("Java Developer", "Description");
+        role.setId(1L);
+
+        AssessmentSession session = new AssessmentSession();
+        session.setId(100L);
+        session.setUser(user);
+        session.setJobRole(role);
+        session.setDifficulty("INTERMEDIATE");
+        session.setQuestionCount(15);
+        session.setResumeStageStatus("COMPLETED");
+        session.setResumeScore(85.0);
+        session.setMcqStageStatus("AVAILABLE");
+
+        when(assessmentSessionRepository.findById(100L)).thenReturn(Optional.of(session));
+        when(resumeEvaluationRepository.findByAssessmentSessionId(100L)).thenReturn(Optional.of(new ResumeEvaluation()));
+
+        Interview mockInterview = new Interview();
+        mockInterview.setId(555L);
+        when(interviewRepository.findById(555L)).thenReturn(Optional.of(mockInterview));
+
+        InterviewResponse mockResp = new InterviewResponse();
+        mockResp.setId(555L);
+        mockResp.setTotalQuestions(15);
+        when(interviewService.createInterview(eq(10L), any(CreateInterviewRequest.class))).thenReturn(mockResp);
+
+        InterviewResponse resp = assessmentSessionService.startOrResumeMcqRound(100L, 10L, 15);
+
+        assertNotNull(resp);
+        assertEquals(555L, resp.getId());
+        assertEquals(15, resp.getTotalQuestions());
+
+        ArgumentCaptor<CreateInterviewRequest> captor = ArgumentCaptor.forClass(CreateInterviewRequest.class);
+        verify(interviewService).createInterview(eq(10L), captor.capture());
+        assertEquals(15, captor.getValue().getQuestionCount());
+        assertEquals("MCQ", captor.getValue().getMode());
+    }
+
+    @Test
+    void testStartOrResumeMcqRoundDefaultsTo20Questions() {
+        User user = new User("Alice", "alice@example.com", "pass", "LOCAL", "ROLE_CANDIDATE");
+        user.setId(10L);
+
+        JobRole role = new JobRole("Java Developer", "Description");
+        role.setId(1L);
+
+        AssessmentSession session = new AssessmentSession();
+        session.setId(100L);
+        session.setUser(user);
+        session.setJobRole(role);
+        session.setDifficulty("INTERMEDIATE");
+        session.setResumeStageStatus("COMPLETED");
+        session.setResumeScore(85.0);
+        session.setMcqStageStatus("AVAILABLE");
+
+        when(assessmentSessionRepository.findById(100L)).thenReturn(Optional.of(session));
+        when(resumeEvaluationRepository.findByAssessmentSessionId(100L)).thenReturn(Optional.of(new ResumeEvaluation()));
+
+        Interview mockInterview = new Interview();
+        mockInterview.setId(777L);
+        when(interviewRepository.findById(777L)).thenReturn(Optional.of(mockInterview));
+
+        InterviewResponse mockResp = new InterviewResponse();
+        mockResp.setId(777L);
+        mockResp.setTotalQuestions(20);
+        when(interviewService.createInterview(eq(10L), any(CreateInterviewRequest.class))).thenReturn(mockResp);
+
+        InterviewResponse resp = assessmentSessionService.startOrResumeMcqRound(100L, 10L);
+
+        assertNotNull(resp);
+        assertEquals(777L, resp.getId());
+
+        ArgumentCaptor<CreateInterviewRequest> captor = ArgumentCaptor.forClass(CreateInterviewRequest.class);
+        verify(interviewService).createInterview(eq(10L), captor.capture());
+        assertEquals(20, captor.getValue().getQuestionCount());
+    }
+
+    @Test
+    void testStartMcqRoundRejectedWhenResumeNotCompleted() {
+        User user = new User("Alice", "alice@example.com", "pass", "LOCAL", "ROLE_CANDIDATE");
+        user.setId(10L);
+
+        AssessmentSession session = new AssessmentSession();
+        session.setId(100L);
+        session.setUser(user);
+        session.setResumeStageStatus("IN_PROGRESS");
+        session.setResumeScore(null);
+        session.setMcqStageStatus("LOCKED");
+
+        when(assessmentSessionRepository.findById(100L)).thenReturn(Optional.of(session));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                assessmentSessionService.startOrResumeMcqRound(100L, 10L)
+        );
+        assertTrue(ex.getMessage().contains("Complete Resume Evaluation to unlock this round."));
+        verifyNoInteractions(interviewService);
+    }
+
+    @Test
+    void testCompleteMcqStageIsIdempotentAndPreventsDuplicateSubmissions() {
+        User user = new User("Alice", "alice@example.com", "pass", "LOCAL", "ROLE_CANDIDATE");
+        user.setId(10L);
+
+        JobRole role = new JobRole("Java Developer", "Description");
+        role.setId(1L);
+
+        AssessmentSession session = new AssessmentSession();
+        session.setId(100L);
+        session.setUser(user);
+        session.setJobRole(role);
+        session.setResumeStageStatus("COMPLETED");
+        session.setResumeScore(85.0);
+        session.setMcqStageStatus("COMPLETED");
+        session.setMcqScore(95.0);
+
+        when(assessmentSessionRepository.findById(100L)).thenReturn(Optional.of(session));
+        when(resumeEvaluationRepository.findByAssessmentSessionId(100L)).thenReturn(Optional.of(new ResumeEvaluation()));
+
+        AssessmentSessionResponse resp = assessmentSessionService.completeMcqStage(100L, 10L, 555L, 50.0);
+
+        assertNotNull(resp);
+        assertEquals(95.0, resp.getMcqScore(), "Duplicate submission should not overwrite already recorded score");
+        verify(assessmentSessionRepository, never()).save(any(AssessmentSession.class));
     }
 }
 

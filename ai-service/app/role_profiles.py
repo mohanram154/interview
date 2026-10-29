@@ -176,3 +176,4 @@ def get_role_benchmark(role_name: str) -> dict:
         return ROLE_BENCHMARKS["Full Stack Developer"]
         
     return ROLE_BENCHMARKS["Software Developer"]
+

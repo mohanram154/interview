@@ -13,3 +13,4 @@ public interface ResumeEvaluationRepository extends JpaRepository<ResumeEvaluati
 
     Optional<ResumeEvaluation> findByAssessmentSessionIdAndUserId(Long assessmentSessionId, Long userId);
 }
+
