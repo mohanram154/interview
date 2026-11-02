@@ -89,6 +89,9 @@ public class ReportService {
                         isCorrect = true;
                     }
                     a.setIsCorrect(isCorrect);
+                    if (answerRepository != null) {
+                        answerRepository.save(a);
+                    }
                     if (isCorrect) {
                         correctCount++;
                         if (q.getCategory() != null && !q.getCategory().isBlank()) {

@@ -308,6 +308,15 @@ public class AssessmentReportService {
                     }
                     String selected = ans != null ? ans.getSelectedOption() : null;
                     Boolean isCorrect = ans != null ? ans.getIsCorrect() : null;
+                    if (isCorrect == null && selected != null && q.getCorrectOption() != null) {
+                        isCorrect = selected.trim().equalsIgnoreCase(q.getCorrectOption().trim());
+                        if (ans != null) {
+                            ans.setIsCorrect(isCorrect);
+                            if (answerRepository != null) {
+                                answerRepository.save(ans);
+                            }
+                        }
+                    }
 
                     qItem.put("selectedOption", selected);
                     qItem.put("isCorrect", Boolean.TRUE.equals(isCorrect));
