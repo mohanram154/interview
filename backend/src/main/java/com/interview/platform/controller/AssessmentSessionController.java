@@ -7,8 +7,10 @@ import com.interview.platform.dto.assessment.CompleteVideoStageRequest;
 import com.interview.platform.dto.assessment.CreateAssessmentSessionRequest;
 import com.interview.platform.dto.common.ApiResponse;
 import com.interview.platform.dto.interview.InterviewResponse;
+import com.interview.platform.dto.report.AssessmentReportResponse;
 import com.interview.platform.entity.AssessmentSession;
 import com.interview.platform.security.UserPrincipal;
+import com.interview.platform.service.AssessmentReportService;
 import com.interview.platform.service.AssessmentSessionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -23,9 +25,14 @@ import java.util.List;
 public class AssessmentSessionController {
 
     private final AssessmentSessionService assessmentSessionService;
+    private final AssessmentReportService assessmentReportService;
 
-    public AssessmentSessionController(AssessmentSessionService assessmentSessionService) {
+    public AssessmentSessionController(
+            AssessmentSessionService assessmentSessionService,
+            AssessmentReportService assessmentReportService
+    ) {
         this.assessmentSessionService = assessmentSessionService;
+        this.assessmentReportService = assessmentReportService;
     }
 
     @PostMapping
@@ -155,14 +162,17 @@ public class AssessmentSessionController {
     }
 
     @GetMapping("/{id}/report")
-    public ResponseEntity<ApiResponse<AssessmentSessionResponse>> getFinalReport(
+    public ResponseEntity<ApiResponse<AssessmentReportResponse>> getFinalReport(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        AssessmentSessionResponse response = assessmentSessionService.getSessionById(id, principal.getId());
-        // Validate all 3 rounds completed before giving report
-        assessmentSessionService.validateStageAccess(toEntitySnapshot(response), "FINAL_REPORT");
-        return ResponseEntity.ok(ApiResponse.success("Final Combined Assessment Report retrieved", response));
+        AssessmentReportResponse report = assessmentReportService.getOrCreateReport(id, principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(
+                "COMPLETED".equals(report.getStatus()) 
+                        ? "Final Combined Assessment Report retrieved" 
+                        : "Assessment report retrieved (Incomplete)", 
+                report
+        ));
     }
 
     private AssessmentSession toEntitySnapshot(AssessmentSessionResponse resp) {

@@ -77,15 +77,23 @@ const McqRoundContent: React.FC<ContentProps> = ({ session, onUpdated }) => {
       const qsRes = await apiClient.get<ApiResponse<InterviewQuestion[]>>(`/interviews/${interviewResp.id}/questions`);
       if (qsRes.data.success) {
         const qs = qsRes.data.data;
-        setQuestions(qs);
 
-        // Map any already submitted answers
+        // Map any already submitted answers accurately
         const ansMap: Record<number, string> = {};
-        qs.forEach(q => {
-          if (q.answered && q.answer?.selectedOption) {
-            ansMap[q.id] = q.answer.selectedOption.toUpperCase();
+        const normalized = qs.map(q => {
+          const opt = (q.selectedOption || q.answer?.selectedOption || '').toUpperCase();
+          const hasAnswer = Boolean(opt && opt.trim().length > 0) || Boolean(q.answered);
+          if (opt) {
+            ansMap[q.id] = opt;
           }
+          return {
+            ...q,
+            answered: hasAnswer,
+            selectedOption: opt || q.selectedOption
+          };
         });
+
+        setQuestions(normalized);
         setSelectedAnswers(ansMap);
       }
 
@@ -125,23 +133,45 @@ const McqRoundContent: React.FC<ContentProps> = ({ session, onUpdated }) => {
     if (!currentQuestion || !interview || session.mcqStageStatus === 'COMPLETED') return;
 
     const opt = optionKey.toUpperCase();
-    setSelectedAnswers(prev => ({ ...prev, [currentQuestion.id]: opt }));
+    const qId = currentQuestion.id;
 
+    // 1. Immediate optimistic UI updates so user sees answer selected & answered count update without delay
+    setSelectedAnswers(prev => ({ ...prev, [qId]: opt }));
+    setQuestions(prev => prev.map(q => {
+      if (q.id === qId) {
+        return {
+          ...q,
+          answered: true,
+          selectedOption: opt,
+          answer: {
+            ...(q.answer || ({} as any)),
+            interviewQuestionId: q.id,
+            selectedOption: opt,
+            answerText: `Option ${opt}`,
+            answerStatus: 'SUBMITTED',
+            submittedAt: new Date().toISOString()
+          }
+        };
+      }
+      return q;
+    }));
+
+    // 2. Autosave answer to backend asynchronously
     try {
       setSavingAnswer(true);
       const res = await apiClient.post<ApiResponse<any>>(`/interviews/${interview.id}/answers`, {
-        interviewQuestionId: currentQuestion.id,
+        interviewQuestionId: qId,
         selectedOption: opt,
         answerText: `Selected option: ${opt}`
       });
 
-      if (res.data.success) {
-        // Update local question state
+      if (res.data.success && res.data.data) {
         setQuestions(prev => prev.map(q => {
-          if (q.id === currentQuestion.id) {
+          if (q.id === qId) {
             return {
               ...q,
               answered: true,
+              selectedOption: opt,
               answer: res.data.data
             };
           }
@@ -227,7 +257,15 @@ const McqRoundContent: React.FC<ContentProps> = ({ session, onUpdated }) => {
     }
   };
 
-  const answeredCount = questions.filter(q => q.answered).length;
+  const isQuestionAnswered = (q: InterviewQuestion) => {
+    return Boolean(
+      q.answered || 
+      (q.selectedOption && q.selectedOption.trim().length > 0) || 
+      (selectedAnswers[q.id] && selectedAnswers[q.id].trim().length > 0)
+    );
+  };
+
+  const answeredCount = questions.filter(isQuestionAnswered).length;
   const unansweredCount = questions.length - answeredCount;
   const markedCount = questions.filter(q => q.markedForReview).length;
   const progressPercent = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
@@ -663,7 +701,8 @@ const McqRoundContent: React.FC<ContentProps> = ({ session, onUpdated }) => {
                       currentQuestion.optionD;
 
                     if (!value) return null;
-                    const isSelected = selectedAnswers[currentQuestion.id] === key;
+                    const selectedKey = selectedAnswers[currentQuestion.id] || currentQuestion.selectedOption;
+                    const isSelected = selectedKey === key;
 
                     return (
                       <div
@@ -699,22 +738,38 @@ const McqRoundContent: React.FC<ContentProps> = ({ session, onUpdated }) => {
             )}
 
             {/* Bottom Controls: Previous / Next & Submit */}
-            <div className="flex items-center justify-between pt-6 border-t border-gray-100">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
                 disabled={currentIndex === 0}
-                className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold text-xs transition-colors disabled:opacity-40 inline-flex items-center gap-2"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold text-xs transition-colors disabled:opacity-40 inline-flex items-center justify-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" /> Previous
               </button>
 
-              <div className="flex items-center gap-3">
+              {/* Live Answer Status Indicator */}
+              <div className="text-xs font-semibold py-1">
+                {(selectedAnswers[currentQuestion.id] || currentQuestion.selectedOption) ? (
+                  <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-full inline-flex items-center gap-1.5 shadow-2xs">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Option {selectedAnswers[currentQuestion.id] || currentQuestion.selectedOption} Saved
+                    {savingAnswer && <Loader2 className="w-3 h-3 text-emerald-600 animate-spin ml-1" />}
+                  </span>
+                ) : (
+                  <span className="text-gray-500 bg-gray-50 border border-gray-200 px-3.5 py-1.5 rounded-full inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-gray-400" />
+                    Unanswered
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
                 {currentIndex < questions.length - 1 ? (
                   <button
                     type="button"
                     onClick={() => setCurrentIndex(prev => Math.min(questions.length - 1, prev + 1))}
-                    className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-colors inline-flex items-center gap-2"
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-colors inline-flex items-center justify-center gap-2"
                   >
                     Next <ArrowRight className="w-4 h-4" />
                   </button>
@@ -722,7 +777,7 @@ const McqRoundContent: React.FC<ContentProps> = ({ session, onUpdated }) => {
                   <button
                     type="button"
                     onClick={() => setShowConfirmModal(true)}
-                    className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition-colors inline-flex items-center gap-2"
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition-colors inline-flex items-center justify-center gap-2"
                   >
                     Submit Interview <CheckCircle2 className="w-4 h-4" />
                   </button>
@@ -770,7 +825,7 @@ const McqRoundContent: React.FC<ContentProps> = ({ session, onUpdated }) => {
               <div className="grid grid-cols-5 gap-2 max-h-[300px] overflow-y-auto pr-1">
                 {questions.map((q, idx) => {
                   const isCurrent = idx === currentIndex;
-                  const isAnswered = q.answered || Boolean(selectedAnswers[q.id]);
+                  const isAnswered = isQuestionAnswered(q);
                   const isMarked = q.markedForReview;
 
                   let btnStyle = 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100';

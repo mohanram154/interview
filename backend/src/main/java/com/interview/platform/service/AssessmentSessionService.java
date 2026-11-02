@@ -18,6 +18,7 @@ import com.interview.platform.repository.InterviewRepository;
 import com.interview.platform.repository.JobRoleRepository;
 import com.interview.platform.repository.ResumeEvaluationRepository;
 import com.interview.platform.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,15 @@ public class AssessmentSessionService {
     private final InterviewReportRepository interviewReportRepository;
     private final InterviewService interviewService;
     private final ResumeEvaluationRepository resumeEvaluationRepository;
+
+    @Value("${app.assessment.weights.resume:0.30}")
+    private double resumeWeight = 0.30;
+
+    @Value("${app.assessment.weights.mcq:0.30}")
+    private double mcqWeight = 0.30;
+
+    @Value("${app.assessment.weights.video:0.40}")
+    private double videoWeight = 0.40;
 
     public AssessmentSessionService(
             AssessmentSessionRepository assessmentSessionRepository,
@@ -352,6 +362,35 @@ public class AssessmentSessionService {
             String sentimentLabel,
             String feedback
     ) {
+        return completeVideoStage(
+                sessionId,
+                userId,
+                score,
+                technicalScore,
+                communicationScore,
+                sentimentLabel,
+                feedback,
+                null,
+                null,
+                null,
+                "CALIBRATED"
+        );
+    }
+
+    @Transactional
+    public AssessmentSessionResponse completeVideoStage(
+            Long sessionId,
+            Long userId,
+            Double score,
+            Double technicalScore,
+            Double communicationScore,
+            String sentimentLabel,
+            String feedback,
+            Double fluencyScore,
+            Double answerStructureScore,
+            Double conceptUsageScore,
+            String confidenceCalibrationLabel
+    ) {
         AssessmentSession session = getSessionEntity(sessionId, userId);
 
         // Validate prerequisite
@@ -361,29 +400,42 @@ public class AssessmentSessionService {
         session.setVideoScore(finalVideoScore);
         session.setVideoTechnicalScore(technicalScore != null ? Math.round(technicalScore * 10.0) / 10.0 : finalVideoScore);
         session.setVideoCommunicationScore(communicationScore != null ? Math.round(communicationScore * 10.0) / 10.0 : finalVideoScore);
+        session.setVideoFluencyScore(fluencyScore != null ? Math.round(fluencyScore * 10.0) / 10.0 : null);
+        session.setVideoAnswerStructureScore(answerStructureScore != null ? Math.round(answerStructureScore * 10.0) / 10.0 : null);
+        session.setVideoConceptUsageScore(conceptUsageScore != null ? Math.round(conceptUsageScore * 10.0) / 10.0 : null);
+        session.setVideoConfidenceCalibrationLabel(confidenceCalibrationLabel != null ? confidenceCalibrationLabel : "CALIBRATED");
         session.setVideoSentimentLabel(sentimentLabel != null ? sentimentLabel : "CONFIDENT");
         session.setVideoFeedback(feedback != null ? feedback : "Video technical interview completed.");
         session.setVideoStageStatus("COMPLETED");
         session.setVideoCompletedAt(LocalDateTime.now());
 
-        // Composite scoring formula: 25% Resume + 40% MCQ + 35% AI Video
-        double resume = session.getResumeScore() != null ? session.getResumeScore() : 0.0;
-        double mcq = session.getMcqScore() != null ? session.getMcqScore() : 0.0;
-        double video = finalVideoScore;
+        // Composite scoring formula: 30% Resume + 30% MCQ + 40% AI Video
+        // Only generate final overall score when all three valid saved scores exist.
+        Double resume = session.getResumeScore();
+        Double mcq = session.getMcqScore();
+        Double video = finalVideoScore;
 
-        double composite = (resume * 0.25) + (mcq * 0.40) + (video * 0.35);
-        double roundedComposite = Math.round(composite * 10.0) / 10.0;
+        if (resume != null && mcq != null && video != null) {
+            double composite = (resume * resumeWeight) + (mcq * mcqWeight) + (video * videoWeight);
+            double roundedComposite = Math.round(composite * 10.0) / 10.0;
 
-        session.setFinalCompositeScore(roundedComposite);
-        session.setFinalSummary(String.format(
-                "Full assessment completed for role '%s' at %s level. Final Composite Score: %.1f%% (Resume: %.1f%%, MCQ: %.1f%%, Video Interview: %.1f%%).",
-                session.getJobRole().getName(),
-                session.getDifficulty(),
-                roundedComposite,
-                resume,
-                mcq,
-                video
-        ));
+            session.setFinalCompositeScore(roundedComposite);
+            session.setFinalSummary(String.format(
+                    "Full assessment completed for role '%s' at %s level. Final Composite Score: %.1f%% (Resume: %.1f%%, MCQ: %.1f%%, Video Interview: %.1f%%). Weights: %.0f%% / %.0f%% / %.0f%%.",
+                    session.getJobRole().getName(),
+                    session.getDifficulty(),
+                    roundedComposite,
+                    resume,
+                    mcq,
+                    video,
+                    resumeWeight * 100,
+                    mcqWeight * 100,
+                    videoWeight * 100
+            ));
+        } else {
+            session.setFinalCompositeScore(null);
+            session.setFinalSummary("Assessment pipeline is incomplete. All three assessment rounds must have valid saved scores.");
+        }
 
         session.setCurrentStage("COMPLETED");
         session.setSessionStatus("COMPLETED");
@@ -493,6 +545,17 @@ public class AssessmentSessionService {
         );
         resp.setVideoRound(videoDto);
 
+        // Detailed Video Analytics Metrics
+        resp.setVideoScore(session.getVideoScore());
+        resp.setVideoTechnicalScore(session.getVideoTechnicalScore());
+        resp.setVideoCommunicationScore(session.getVideoCommunicationScore());
+        resp.setVideoFluencyScore(session.getVideoFluencyScore());
+        resp.setVideoAnswerStructureScore(session.getVideoAnswerStructureScore());
+        resp.setVideoConceptUsageScore(session.getVideoConceptUsageScore());
+        resp.setVideoConfidenceCalibrationLabel(session.getVideoConfidenceCalibrationLabel());
+        resp.setVideoSentimentLabel(session.getVideoSentimentLabel());
+        resp.setVideoFeedback(session.getVideoFeedback());
+
         // --- Final Combined Report ---
         boolean isFinalReportUnlocked = isVideoCompleted;
         resp.setFinalReportUnlocked(isFinalReportUnlocked);
@@ -504,6 +567,9 @@ public class AssessmentSessionService {
         resp.setUpdatedAt(session.getUpdatedAt());
         resp.setCompletedAt(session.getCompletedAt());
         resp.setVideoConsentGivenAt(session.getVideoConsentGivenAt());
+        resp.setRecordingsRetentionExpiresAt(session.getRecordingsRetentionExpiresAt());
+        resp.setRecordingsDeletedAt(session.getRecordingsDeletedAt());
+        resp.setRecordingsDeletedByUser(session.getRecordingsDeletedByUser());
 
         return resp;
     }

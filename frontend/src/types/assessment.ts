@@ -58,6 +58,10 @@ export interface AssessmentSession {
   videoScore?: number;
   videoTechnicalScore?: number;
   videoCommunicationScore?: number;
+  videoFluencyScore?: number;
+  videoAnswerStructureScore?: number;
+  videoConceptUsageScore?: number;
+  videoConfidenceCalibrationLabel?: string;
   videoSentimentLabel?: string;
   videoFeedback?: string;
   videoConsentGivenAt?: string;
@@ -74,6 +78,10 @@ export interface AssessmentSession {
   resumeRound?: RoundDetail;
   mcqRound?: RoundDetail;
   videoRound?: RoundDetail;
+
+  recordingsRetentionExpiresAt?: string;
+  recordingsDeletedAt?: string;
+  recordingsDeletedByUser?: boolean;
 
   createdAt: string;
   updatedAt: string;
@@ -207,10 +215,74 @@ export interface VideoQuestion {
   recordingDurationSeconds?: number;
   recordingFileSize?: number;
   recordingMimeType?: string;
+
+  // Transcription
   transcript?: string;
+  transcriptionStatus?: string;
+  transcriptionProvider?: string;
+  transcriptionNotes?: string;
+  wordTimestamps?: string;
+
+  // Fluency & Hesitation
   fillerWordsCount?: number;
+  fillerWordRate?: number;
+  fillerWordsPerMinute?: number;
+  fillerWordsList?: string;
+  pauseCount?: number;
+  pausesCount?: number;
+  avgPauseDuration?: number;
+  avgPauseDurationSec?: number;
+  longestPauseDuration?: number;
+  longestPauseDurationSec?: number;
+  repeatedWordsCount?: number;
+  fluencyScore?: number;
+  fluencyNotes?: string;
   speechClarityLevel?: string;
+
+  // Prosody & Tone
+  prosodyStatus?: string;
+  prosodyAnalysisStatus?: string;
+  pitchVariation?: number;
+  pitchVariationStatus?: string;
+  vocalEnergyVariation?: number;
+  energyVariationStatus?: string;
+  speechRhythmScore?: number;
+  prosodyNotes?: string;
+
+  // Speech Rate & Sentiment
+  speakingWpm?: number;
+  totalWpm?: number;
+  speechRateClassification?: string;
   sentimentLabel?: string;
+  sentimentReliability?: string;
+  sentimentReliabilityRating?: string;
+  vocalIntensity?: string;
+
+  // Technical Competency
+  technicalScore?: number;
+  answerStructureScore?: number;
+  communicationScore?: number;
+  relevanceScore?: number;
+  completenessScore?: number;
+  conceptUsageScore?: number;
+  matchedKeyPoints?: string;
+  missingKeyPoints?: string;
+  evaluatorModel?: string;
+  evaluationModel?: string;
+  feedback?: string;
+  competencyFeedback?: string;
+  improvementSuggestions?: string;
+
+  // Confidence Calibration
+  linguisticConfidenceScore?: number;
+  confidenceCalibrationLabel?: 'CALIBRATED' | 'POSSIBLE_OVERCONFIDENCE' | 'POSSIBLE_UNDERCONFIDENCE' | string;
+  confidenceDelta?: number;
+  confidenceCalibrationExplanation?: string;
+  confidenceCalibrationReason?: string;
+
+  // Composite Question Score
+  questionScore?: number;
+
   uploadedAt?: string;
 }
 
@@ -225,4 +297,193 @@ export interface VideoInterviewStatus {
   uploadedQuestions: number;
   allQuestionsUploaded: boolean;
   questions: VideoQuestion[];
+}
+
+export interface ResumeScorecardData {
+  status: 'COMPLETED' | 'INCOMPLETE';
+  score?: number;
+  weight: number;
+  targetRole?: string;
+  companyName?: string;
+  jobDescription?: string;
+  filename?: string;
+  feedback?: string;
+  scoringBreakdown?: {
+    technicalSkillScore?: number;
+    projectExperienceScore?: number;
+    internshipWorkScore?: number;
+    educationCertScore?: number;
+    practicalEvidenceScore?: number;
+    roleAlignmentScore?: number;
+    scoreExplanations?: Record<string, any>;
+  };
+  matchedSkills?: Array<{
+    skill: string;
+    category: string;
+    evidencedInProjects?: boolean;
+    evidenceNotes?: string;
+  }>;
+  missingSkills?: Array<{
+    skill: string;
+    category: string;
+    importance: string;
+  }>;
+  relevantProjects?: Array<{
+    title: string;
+    matchedTechnologies: string[];
+    relevanceScore: number;
+    description?: string;
+  }>;
+  strengths?: string[];
+  recommendations?: string[];
+}
+
+export interface McqQuestionReviewItem {
+  sequenceNumber: number;
+  questionText: string;
+  category: string;
+  options: string[];
+  selectedOption?: string;
+  correctOption: string;
+  isCorrect: boolean;
+  explanation?: string;
+}
+
+export interface McqTopicPerformanceItem {
+  topic: string;
+  total: number;
+  correct: number;
+  percentage: number;
+}
+
+export interface McqScorecardData {
+  status: 'COMPLETED' | 'INCOMPLETE';
+  score?: number;
+  percentage?: number;
+  weight: number;
+  totalQuestionsCount?: number;
+  correctAnswersCount?: number;
+  incorrectAnswersCount?: number;
+  unansweredCount?: number;
+  topicWisePerformance?: McqTopicPerformanceItem[];
+  questions?: McqQuestionReviewItem[];
+  learningGaps?: string[];
+}
+
+export interface VideoQuestionReviewItem {
+  sequenceNumber: number;
+  questionText: string;
+  category: string;
+  questionScore?: number;
+  technicalScore?: number;
+  conceptUsageScore?: number;
+  fluencyScore?: number;
+  transcript?: string;
+  feedback?: string;
+  confidenceCalibrationLabel?: string;
+  confidenceCalibrationExplanation?: string;
+  prosodyStatus?: string;
+  prosodyNotes?: string;
+  matchedKeyPoints?: string[];
+  missingKeyPoints?: string[];
+}
+
+export interface VideoScorecardData {
+  status: 'COMPLETED' | 'INCOMPLETE';
+  score?: number;
+  weight: number;
+  totalQuestions?: number;
+  technicalAnswerQualityBreakdown?: {
+    technicalCorrectness: number;
+    answerStructureClarity: number;
+    roleConceptUsage: number;
+    speechFluency: number;
+    communicationEffectiveness: number;
+  };
+  hesitationAndFluencyMetrics?: {
+    totalFillerWordsCount: number;
+    totalPauseCount: number;
+    totalRepeatedWordsCount: number;
+    fluencyScore: number;
+    speechClarityLevel: string;
+    ethicalDisclaimer?: string;
+  };
+  speechRate?: {
+    averageSpeakingWpm: number;
+    speechRateClassification: string;
+  };
+  prosodyAndMeasurements?: {
+    prosodyStatus: string;
+    pitchVariationStatus: string;
+    energyVariationStatus: string;
+    prosodyNotes: string;
+  };
+  sentimentAndIntensity?: {
+    sentimentLabel: string;
+    sentimentReliability: string;
+    vocalIntensity: string;
+  };
+  confidenceCalibration?: {
+    dominantLabel: string;
+    explanation: string;
+  };
+  questions?: VideoQuestionReviewItem[];
+}
+
+export interface LearningRoadmapPhase {
+  phase: string;
+  duration: string;
+  focus: string;
+  actions: string[];
+}
+
+export interface AssessmentReport {
+  id?: number;
+  assessmentSessionId: number;
+  jobRoleName: string;
+  difficulty: string;
+  status: 'COMPLETED' | 'INCOMPLETE';
+  incompleteReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+
+  // Weights & Formula
+  resumeWeight: number;
+  mcqWeight: number;
+  videoWeight: number;
+  formulaText: string;
+
+  // Scores
+  overallScore?: number;
+  resumeScore?: number;
+  mcqScore?: number;
+  videoScore?: number;
+
+  // Scorecards
+  resumeCard?: ResumeScorecardData;
+  mcqCard?: McqScorecardData;
+  videoCard?: VideoScorecardData;
+
+  // Insights
+  overallStrengths?: string[];
+  overallSkillGaps?: string[];
+  learningRoadmap?: LearningRoadmapPhase[];
+  disclaimer: string;
+}
+
+export interface ReportHistoryItem {
+  id: number;
+  assessmentSessionId: number;
+  jobRoleName: string;
+  difficulty: string;
+  status: string;
+  overallScore?: number;
+  resumeScore?: number;
+  mcqScore?: number;
+  videoScore?: number;
+  recordingsRetentionExpiresAt?: string;
+  recordingsDeletedAt?: string;
+  recordingsDeletedByUser?: boolean;
+
+  createdAt: string;
 }

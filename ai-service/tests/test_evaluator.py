@@ -55,6 +55,20 @@ def test_sentiment_analysis():
     assert good_res.sentimentLabel == "POSITIVE"
     assert "scalable" in good_res.positiveIndicators or "robust" in good_res.positiveIndicators
 
+from app.config import INTERNAL_SERVICE_KEY
+
+AUTH_HEADERS = {"X-Internal-Service-Key": INTERNAL_SERVICE_KEY}
+
+def test_internal_endpoint_rejects_unauthorized():
+    resp = client.post("/internal/evaluate", json={
+        "questionText": "What is Java?",
+        "answerText": "Java is an OOP language",
+        "jobRole": "Java Developer",
+        "difficulty": "BEGINNER"
+    })
+    assert resp.status_code == 401
+    assert "Unauthorized" in resp.json()["detail"]
+
 def test_evaluate_endpoint_validation():
     # Empty question
     resp = client.post("/internal/evaluate", json={
@@ -62,7 +76,7 @@ def test_evaluate_endpoint_validation():
         "answerText": "Some answer",
         "jobRole": "Java Developer",
         "difficulty": "BEGINNER"
-    })
+    }, headers=AUTH_HEADERS)
     assert resp.status_code == 400
 
     # Empty answer
@@ -71,6 +85,6 @@ def test_evaluate_endpoint_validation():
         "answerText": "",
         "jobRole": "Python Developer",
         "difficulty": "BEGINNER"
-    })
+    }, headers=AUTH_HEADERS)
     assert resp2.status_code == 400
 

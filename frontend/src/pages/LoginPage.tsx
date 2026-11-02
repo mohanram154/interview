@@ -55,9 +55,9 @@ export const LoginPage: React.FC = () => {
 
         {/* Google Authentication Section */}
         <div className="space-y-4">
-          <GoogleSignInButton 
-            text="signin_with" 
-            onSuccess={() => navigate(from, { replace: true })} 
+          <GoogleSignInButton
+            text="signin_with"
+            onSuccess={() => navigate(from, { replace: true })}
           />
 
           <div className="relative my-4">

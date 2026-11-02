@@ -1,8 +1,9 @@
+import json
 import logging
-from typing import Optional
-from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import AI_PROVIDER, PORT, HOST
+from app.config import AI_PROVIDER, PORT, HOST, INTERNAL_SERVICE_KEY
 from app.schemas import (
     HealthResponse, 
     EvaluationRequest, 
@@ -20,6 +21,15 @@ from app.resume_parser import (
     ScannedPdfError
 )
 from app.resume_evaluator import evaluate_resume
+from app.speech_analytics import (
+    process_transcription,
+    analyze_fluency_and_hesitation,
+    analyze_tone_and_prosody,
+    analyze_speech_rate_and_sentiment,
+    evaluate_technical_answer,
+    compute_confidence_calibration,
+    calculate_weighted_video_question_score
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s")
 logger = logging.getLogger("ai_service")
@@ -46,7 +56,30 @@ def health():
         version="1.0.0"
     )
 
-@app.post("/internal/evaluate", response_model=EvaluationResponse)
+def verify_internal_service_key(
+    x_internal_service_key: Optional[str] = Header(None, alias="X-Internal-Service-Key"),
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Enforces service-to-service authentication between Spring Boot backend and Python AI microservice.
+    Accepts key via 'X-Internal-Service-Key' header or 'Authorization: Bearer <key>'.
+    """
+    if not INTERNAL_SERVICE_KEY:
+        return True
+    
+    token = x_internal_service_key
+    if not token and authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+        
+    if not token or token != INTERNAL_SERVICE_KEY:
+        logger.warning("Unauthorized service request to internal endpoint. Missing or invalid service token.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized service request: Invalid or missing internal service key."
+        )
+    return True
+
+@app.post("/internal/evaluate", response_model=EvaluationResponse, dependencies=[Depends(verify_internal_service_key)])
 def evaluate(request: EvaluationRequest):
     if not request.questionText.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question text cannot be empty.")
@@ -63,7 +96,7 @@ def evaluate(request: EvaluationRequest):
             detail=f"Evaluation failed: {str(e)}"
         )
 
-@app.post("/internal/sentiment", response_model=SentimentResponse)
+@app.post("/internal/sentiment", response_model=SentimentResponse, dependencies=[Depends(verify_internal_service_key)])
 def sentiment(request: SentimentRequest):
     try:
         return analyze_sentiment(request.text)
@@ -74,7 +107,7 @@ def sentiment(request: SentimentRequest):
             detail=f"Sentiment analysis failed: {str(e)}"
         )
 
-@app.post("/internal/resume/parse")
+@app.post("/internal/resume/parse", dependencies=[Depends(verify_internal_service_key)])
 async def parse_resume(file: UploadFile = File(...)):
     """
     Parses PDF or DOCX file bytes into structured candidate sections.
@@ -132,7 +165,7 @@ async def parse_resume(file: UploadFile = File(...)):
             detail=f"Resume parsing failed: {str(e)}"
         )
 
-@app.post("/internal/resume/evaluate")
+@app.post("/internal/resume/evaluate", dependencies=[Depends(verify_internal_service_key)])
 def evaluate_parsed_resume(request: ResumeEvaluateRequest):
     """
     Contextual, role-based evaluation of parsed (or candidate-corrected) resume data.
@@ -155,24 +188,27 @@ def evaluate_parsed_resume(request: ResumeEvaluateRequest):
             detail=f"Resume evaluation failed: {str(e)}"
         )
 
-@app.post("/internal/video/analyze-recording")
+@app.post("/internal/video/analyze-recording", dependencies=[Depends(verify_internal_service_key)])
 async def analyze_video_recording(
     file: UploadFile = File(...),
     transcript: Optional[str] = Form(None),
     target_role: Optional[str] = Form(None),
-    question_text: Optional[str] = Form(None)
+    question_text: Optional[str] = Form(None),
+    duration_seconds: Optional[float] = Form(0.0),
+    word_timestamps_json: Optional[str] = Form(None)
 ):
     """
     Analyzes uploaded candidate video recording and accompanying spoken speech transcript.
-    Inspects container integrity, size, duration, and extracts speech/audio characteristics
-    including filler words count, professional clarity, and sentiment.
+    Inspects container integrity, size, duration, acoustic prosody, speech rate,
+    hesitation/pause metrics, technical accuracy against role benchmarks,
+    and contradiction-weighted confidence calibration.
     Never invents missing speech data or fake transcripts.
     """
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Recording filename cannot be empty.")
 
     filename_lower = file.filename.lower()
-    valid_extensions = ('.webm', '.mp4', '.mkv')
+    valid_extensions = ('.webm', '.mp4', '.mkv', '.wav')
     if not any(filename_lower.endswith(ext) for ext in valid_extensions):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -201,36 +237,107 @@ async def analyze_video_recording(
             detail="Recording file exceeds the maximum allowed limit of 50 MB."
         )
 
+    # Parse optional client word timestamps
+    client_timestamps: Optional[List[Dict[str, Any]]] = None
+    if word_timestamps_json and word_timestamps_json.strip():
+        try:
+            parsed = json.loads(word_timestamps_json)
+            if isinstance(parsed, list):
+                client_timestamps = parsed
+        except Exception:
+            client_timestamps = None
+
+    duration = float(duration_seconds) if duration_seconds is not None else 0.0
+
+    # 1. Process transcription and word timestamps
+    trans_info = process_transcription(transcript, client_timestamps, duration)
+    effective_transcript = trans_info["transcript"]
+
+    # 2. Fluency and hesitation metrics
+    fluency_info = analyze_fluency_and_hesitation(effective_transcript, trans_info["wordTimestamps"], duration)
+
+    # 3. Acoustic prosody & tone dynamics
+    prosody_info = analyze_tone_and_prosody(file_bytes, file.filename, duration)
+
+    # 4. Speech rate & linguistic sentiment
+    rate_info = analyze_speech_rate_and_sentiment(effective_transcript, duration, prosody_info["prosodyStatus"])
+
+    # 5. Technical competency evaluation against role benchmarks
+    effective_role = target_role if target_role and target_role.strip() else "Software Developer"
+    effective_q = question_text if question_text and question_text.strip() else "Technical interview question"
+    tech_info = evaluate_technical_answer(effective_q, effective_transcript, effective_role)
+
+    # 6. Contradiction-weighted confidence scoring
+    calib_info = compute_confidence_calibration(effective_transcript, tech_info["technicalScore"])
+
+    # 7. Weighted Composite Video Score (40% Tech, 20% Relevance, 15% Concepts, 15% Fluency, 10% Completeness)
+    question_score = calculate_weighted_video_question_score(
+        technical_score=tech_info["technicalScore"],
+        relevance_score=tech_info["relevanceScore"],
+        concept_score=tech_info["conceptUsageScore"],
+        fluency_score=fluency_info["fluencyScore"],
+        completeness_score=tech_info["completenessScore"]
+    )
+
     analysis_data = {
         "filename": file.filename,
         "fileSizeBytes": file_size,
-        "format": "webm" if filename_lower.endswith(".webm") else "mp4",
-        "hasTranscript": bool(transcript and transcript.strip()),
-        "transcript": transcript.strip() if transcript else None
+        "format": "webm" if filename_lower.endswith(".webm") else "wav" if filename_lower.endswith(".wav") else "mp4",
+        "hasTranscript": bool(effective_transcript),
+        "transcript": effective_transcript,
+        # Transcription
+        "transcriptionStatus": trans_info["transcriptionStatus"],
+        "transcriptionProvider": trans_info["transcriptionProvider"],
+        "transcriptionNotes": trans_info["transcriptionNotes"],
+        "wordTimestamps": trans_info["wordTimestamps"],
+        # Fluency & Hesitation
+        "fillerWordsCount": fluency_info["fillerWordsCount"],
+        "fillerWordRate": fluency_info["fillerWordRate"],
+        "pauseCount": fluency_info["pauseCount"],
+        "avgPauseDuration": fluency_info["avgPauseDuration"],
+        "longestPauseDuration": fluency_info["longestPauseDuration"],
+        "repeatedWordsCount": fluency_info["repeatedWordsCount"],
+        "fluencyScore": fluency_info["fluencyScore"],
+        "fluencyNotes": fluency_info["fluencyNotes"],
+        # Prosody & Tone
+        "prosodyStatus": prosody_info["prosodyStatus"],
+        "pitchVariation": prosody_info["pitchVariation"],
+        "vocalEnergyVariation": prosody_info["vocalEnergyVariation"],
+        "speechRhythmScore": prosody_info["speechRhythmScore"],
+        "prosodyNotes": prosody_info["prosodyNotes"],
+        # Speech Rate & Sentiment
+        "speakingWpm": rate_info["speakingWpm"],
+        "totalWpm": rate_info["totalWpm"],
+        "sentimentLabel": rate_info["sentimentLabel"],
+        "sentimentReliability": rate_info["sentimentReliability"],
+        "vocalIntensity": rate_info["vocalIntensity"],
+        # Technical Evaluation
+        "technicalScore": tech_info["technicalScore"],
+        "relevanceScore": tech_info["relevanceScore"],
+        "completenessScore": tech_info["completenessScore"],
+        "conceptUsageScore": tech_info["conceptUsageScore"],
+        "matchedKeyPoints": tech_info["matchedKeyPoints"],
+        "missingKeyPoints": tech_info["missingKeyPoints"],
+        "evaluatorModel": tech_info["evaluatorModel"],
+        "feedback": tech_info["feedback"],
+        "improvementSuggestions": tech_info["improvementSuggestions"],
+        # Confidence Calibration
+        "linguisticConfidenceScore": calib_info["linguisticConfidenceScore"],
+        "confidenceCalibrationLabel": calib_info["confidenceCalibrationLabel"],
+        "confidenceDelta": calib_info["confidenceDelta"],
+        "confidenceCalibrationExplanation": calib_info["confidenceCalibrationExplanation"],
+        # Composite Question Score
+        "questionScore": question_score,
+        # Backwards compatibility block
+        "speechSentiment": {
+            "sentimentLabel": rate_info["sentimentLabel"],
+            "sentimentConfidence": 0.9 if rate_info["sentimentReliability"] == "HIGH" else 0.75,
+            "fillerWordsCount": fluency_info["fillerWordsCount"],
+            "clarityLevel": "HIGH" if fluency_info["fluencyScore"] >= 80 else "MODERATE" if fluency_info["fluencyScore"] >= 65 else "DEVELOPING",
+            "hesitationMarkers": [f"{fluency_info['pauseCount']} pauses", f"{fluency_info['fillerWordsCount']} fillers"],
+            "positiveIndicators": tech_info["matchedKeyPoints"][:3]
+        }
     }
-
-    if transcript and transcript.strip():
-        # Analyze real speech features using sentiment analyzer
-        speech_sentiment = analyze_sentiment(transcript.strip())
-        analysis_data["speechSentiment"] = {
-            "sentimentLabel": speech_sentiment.sentimentLabel,
-            "sentimentConfidence": speech_sentiment.sentimentConfidence,
-            "fillerWordsCount": speech_sentiment.fillerWordsCount,
-            "clarityLevel": speech_sentiment.clarityLevel,
-            "hesitationMarkers": speech_sentiment.hesitationMarkers,
-            "positiveIndicators": speech_sentiment.positiveIndicators
-        }
-    else:
-        # Transcript was not provided or audio recognition was inactive
-        # Do not fake a transcript!
-        analysis_data["speechSentiment"] = {
-            "sentimentLabel": "NEUTRAL",
-            "sentimentConfidence": 0.8,
-            "fillerWordsCount": 0,
-            "clarityLevel": "PENDING_TRANSCRIPTION",
-            "hesitationMarkers": [],
-            "positiveIndicators": []
-        }
 
     return {"success": True, "data": analysis_data}
 

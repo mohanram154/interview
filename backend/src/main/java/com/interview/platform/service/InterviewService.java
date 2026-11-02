@@ -245,6 +245,9 @@ public class InterviewService {
             answer.setSubmittedAt(LocalDateTime.now());
             Answer savedAnswer = answerRepository.save(answer);
 
+            question.setAnswer(savedAnswer);
+            interviewQuestionRepository.save(question);
+
             boolean isCompleted = "COMPLETED".equalsIgnoreCase(interview.getStatus());
             return mapToAnswerResponse(savedAnswer, isCompleted);
         } else {
@@ -386,6 +389,9 @@ public class InterviewService {
         }
 
         Answer answer = iq.getAnswer();
+        if (answer == null && iq.getId() != null) {
+            answer = answerRepository.findByInterviewQuestionId(iq.getId()).orElse(null);
+        }
         if (answer != null) {
             resp.setAnswered(true);
             resp.setSelectedOption(answer.getSelectedOption());

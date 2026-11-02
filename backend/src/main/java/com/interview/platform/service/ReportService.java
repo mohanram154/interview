@@ -5,6 +5,7 @@ import com.interview.platform.entity.*;
 import com.interview.platform.exception.BadRequestException;
 import com.interview.platform.exception.ResourceNotFoundException;
 import com.interview.platform.exception.UnauthorizedAccessException;
+import com.interview.platform.repository.AnswerRepository;
 import com.interview.platform.repository.InterviewReportRepository;
 import com.interview.platform.repository.InterviewRepository;
 import org.springframework.stereotype.Service;
@@ -20,15 +21,27 @@ public class ReportService {
     private final InterviewRepository interviewRepository;
     private final InterviewReportRepository reportRepository;
     private final InterviewService interviewService;
+    private final AnswerRepository answerRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ReportService(
+            InterviewRepository interviewRepository,
+            InterviewReportRepository reportRepository,
+            InterviewService interviewService,
+            AnswerRepository answerRepository
+    ) {
+        this.interviewRepository = interviewRepository;
+        this.reportRepository = reportRepository;
+        this.interviewService = interviewService;
+        this.answerRepository = answerRepository;
+    }
 
     public ReportService(
             InterviewRepository interviewRepository,
             InterviewReportRepository reportRepository,
             InterviewService interviewService
     ) {
-        this.interviewRepository = interviewRepository;
-        this.reportRepository = reportRepository;
-        this.interviewService = interviewService;
+        this(interviewRepository, reportRepository, interviewService, null);
     }
 
     @Transactional
@@ -66,6 +79,9 @@ public class ReportService {
 
             for (InterviewQuestion q : questions) {
                 Answer a = q.getAnswer();
+                if (a == null && q.getId() != null && answerRepository != null) {
+                    a = answerRepository.findByInterviewQuestionId(q.getId()).orElse(null);
+                }
                 if (a != null && a.getSelectedOption() != null && !a.getSelectedOption().isBlank()) {
                     answeredCount++;
                     boolean isCorrect = false;

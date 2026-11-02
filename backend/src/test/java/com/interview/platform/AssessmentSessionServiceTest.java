@@ -204,8 +204,8 @@ class AssessmentSessionServiceTest {
         when(assessmentSessionRepository.save(any(AssessmentSession.class))).thenAnswer(i -> i.getArgument(0));
 
         // Video score: 85.0
-        // Expected Composite = (80.0 * 0.25) + (90.0 * 0.40) + (85.0 * 0.35)
-        // = 20.0 + 36.0 + 29.75 = 85.75 -> rounded to 85.8
+        // Expected Composite = (80.0 * 0.30) + (90.0 * 0.30) + (85.0 * 0.40)
+        // = 24.0 + 27.0 + 34.0 = 85.0
         AssessmentSessionResponse resp = assessmentSessionService.completeVideoStage(
                 100L, 10L, 85.0, 85.0, 85.0, "CONFIDENT", "Superb video interview"
         );
@@ -214,7 +214,7 @@ class AssessmentSessionServiceTest {
         assertEquals("COMPLETED", resp.getVideoStageStatus());
         assertEquals("COMPLETED", resp.getCurrentStage());
         assertEquals("COMPLETED", resp.getSessionStatus());
-        assertEquals(85.8, resp.getFinalCompositeScore());
+        assertEquals(85.0, resp.getFinalCompositeScore());
         assertTrue(resp.isFinalReportUnlocked(), "Final report must be unlocked after all three rounds finish");
     }
 

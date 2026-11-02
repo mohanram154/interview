@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  Bot, 
-  LayoutDashboard, 
-  PlayCircle, 
-  History, 
-  User, 
-  LogOut, 
-  Menu, 
+import {
+  Bot,
+  LayoutDashboard,
+  PlayCircle,
+  History,
+  User,
+  LogOut,
+  Menu,
   X
 } from 'lucide-react';
 
@@ -44,11 +44,9 @@ export const Navbar: React.FC = () => {
               </div>
               <div>
                 <span className="font-bold text-lg text-gray-900 tracking-tight">
-                  Smart<span className="text-violet-600">Interview</span>
+                  Interview<span className="text-violet-600">Verse</span>
                 </span>
-                <span className="hidden sm:inline-block ml-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200">
-                  MCQ v2.0
-                </span>
+
               </div>
             </Link>
           </div>
@@ -63,11 +61,10 @@ export const Navbar: React.FC = () => {
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
-                      active
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${active
                         ? 'bg-violet-100 text-violet-700 font-semibold border border-violet-200 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-violet-50'
-                    }`}
+                      }`}
                   >
                     <Icon className={`w-4 h-4 ${active ? 'text-violet-600' : 'text-gray-400'}`} />
                     {link.name}
@@ -139,11 +136,10 @@ export const Navbar: React.FC = () => {
                     key={link.path}
                     to={link.path}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${
-                      isActive(link.path)
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium ${isActive(link.path)
                         ? 'bg-violet-100 text-violet-700 border border-violet-200'
                         : 'text-gray-600 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-4 h-4" />
                     {link.name}

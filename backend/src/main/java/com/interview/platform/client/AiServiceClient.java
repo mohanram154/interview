@@ -5,6 +5,7 @@ import com.interview.platform.dto.ai.AiEvaluationResponse;
 import com.interview.platform.exception.BadRequestException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.io.ByteArrayResource;
@@ -26,24 +27,46 @@ public class AiServiceClient {
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final String serviceKey;
 
+    @Autowired
     public AiServiceClient(
             RestTemplateBuilder builder,
             @Value("${app.ai-service.url:http://localhost:8000}") String baseUrl,
-            @Value("${app.ai-service.timeout-ms:15000}") long timeoutMs
+            @Value("${app.ai-service.timeout-ms:15000}") long timeoutMs,
+            @Value("${app.ai-service.service-key:interviewverse-internal-service-token-secret-2026}") String serviceKey
     ) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.serviceKey = serviceKey;
         this.restTemplate = builder
                 .setConnectTimeout(Duration.ofMillis(timeoutMs))
                 .setReadTimeout(Duration.ofMillis(timeoutMs))
                 .build();
     }
 
+    public AiServiceClient(
+            RestTemplateBuilder builder,
+            String baseUrl,
+            long timeoutMs
+    ) {
+        this(builder, baseUrl, timeoutMs, "interviewverse-internal-service-token-secret-2026");
+    }
+
+    private HttpHeaders createHeaders(MediaType mediaType) {
+        HttpHeaders headers = new HttpHeaders();
+        if (mediaType != null) {
+            headers.setContentType(mediaType);
+        }
+        if (serviceKey != null && !serviceKey.isBlank()) {
+            headers.set("X-Internal-Service-Key", serviceKey.trim());
+        }
+        return headers;
+    }
+
     public AiEvaluationResponse evaluateAnswer(AiEvaluationRequest request) {
         String url = baseUrl + "/internal/evaluate";
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpHeaders headers = createHeaders(MediaType.APPLICATION_JSON);
             HttpEntity<AiEvaluationRequest> entity = new HttpEntity<>(request, headers);
 
             ResponseEntity<AiEvaluationResponse> response = restTemplate.postForEntity(url, entity, AiEvaluationResponse.class);
@@ -62,8 +85,7 @@ public class AiServiceClient {
     public Map<String, Object> parseResume(MultipartFile file) {
         String url = baseUrl + "/internal/resume/parse";
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpHeaders headers = createHeaders(MediaType.MULTIPART_FORM_DATA);
 
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
@@ -94,8 +116,7 @@ public class AiServiceClient {
     public Map<String, Object> evaluateResume(Map<String, Object> payload) {
         String url = baseUrl + "/internal/resume/evaluate";
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpHeaders headers = createHeaders(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
@@ -131,11 +152,17 @@ public class AiServiceClient {
         return defaultMsg;
     }
 
-    public Map<String, Object> analyzeVideoRecording(MultipartFile file, String transcript, String targetRole) {
+    public Map<String, Object> analyzeVideoRecording(
+            MultipartFile file,
+            String transcript,
+            String targetRole,
+            String questionText,
+            Integer durationSeconds,
+            String wordTimestampsJson
+    ) {
         String url = baseUrl + "/internal/video/analyze-recording";
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpHeaders headers = createHeaders(MediaType.MULTIPART_FORM_DATA);
 
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("file", new ByteArrayResource(file.getBytes()) {
@@ -150,6 +177,15 @@ public class AiServiceClient {
             if (targetRole != null && !targetRole.isBlank()) {
                 body.add("target_role", targetRole);
             }
+            if (questionText != null && !questionText.isBlank()) {
+                body.add("question_text", questionText);
+            }
+            if (durationSeconds != null) {
+                body.add("duration_seconds", durationSeconds.toString());
+            }
+            if (wordTimestampsJson != null && !wordTimestampsJson.isBlank()) {
+                body.add("word_timestamps_json", wordTimestampsJson);
+            }
 
             HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
@@ -160,6 +196,10 @@ public class AiServiceClient {
             log.warn("AI Service call to {} failed: {}. Continuing with standard recording persistence.", url, e.getMessage());
         }
         return Collections.emptyMap();
+    }
+
+    public Map<String, Object> analyzeVideoRecording(MultipartFile file, String transcript, String targetRole) {
+        return analyzeVideoRecording(file, transcript, targetRole, null, null, null);
     }
 
     private AiEvaluationResponse calculateBaselineFallback(AiEvaluationRequest request) {

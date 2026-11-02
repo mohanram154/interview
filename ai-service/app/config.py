@@ -5,4 +5,5 @@ AI_API_KEY = os.getenv("AI_API_KEY", "").strip()
 AI_MODEL = os.getenv("AI_MODEL", "gemini-1.5-flash" if AI_PROVIDER == "gemini" else "gpt-4o-mini")
 PORT = int(os.getenv("PORT", "8000"))
 HOST = os.getenv("HOST", "0.0.0.0")
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "interviewverse-internal-service-token-secret-2026").strip()
 

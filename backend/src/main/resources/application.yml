@@ -12,7 +12,7 @@ spring:
       max-file-size: 50MB
       max-request-size: 60MB
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:interview_platform}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:interviewverse}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:Honeybee@123}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -47,6 +47,15 @@ app:
   ai-service:
     url: ${AI_SERVICE_URL:http://localhost:8000}
     timeout-ms: ${AI_SERVICE_TIMEOUT_MS:15000}
+    service-key: ${AI_SERVICE_KEY:interviewverse-internal-service-token-secret-2026}
+  video:
+    retention-days: ${VIDEO_RETENTION_DAYS:30}
+    max-file-size: ${VIDEO_MAX_FILE_SIZE:52428800}
+  assessment:
+    weights:
+      resume: ${ASSESSMENT_WEIGHT_RESUME:0.30}
+      mcq: ${ASSESSMENT_WEIGHT_MCQ:0.30}
+      video: ${ASSESSMENT_WEIGHT_VIDEO:0.40}
   resume:
     max-file-size: ${RESUME_MAX_FILE_SIZE:5242880}
   cors:

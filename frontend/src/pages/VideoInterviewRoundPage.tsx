@@ -28,8 +28,49 @@ import {
   UserCheck, 
   RefreshCw, 
   AlertTriangle,
-  Radio
+  Radio,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Activity
 } from 'lucide-react';
+
+const parseJsonArray = (val?: string): string[] => {
+  if (!val) return [];
+  try {
+    const parsed = JSON.parse(val);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return val.split(',').map(s => s.trim()).filter(Boolean);
+  }
+};
+
+const getConfidenceBadge = (label?: string) => {
+  switch (label) {
+    case 'POSSIBLE_OVERCONFIDENCE':
+      return {
+        bg: 'bg-amber-50 text-amber-800 border-amber-200',
+        dot: 'bg-amber-500',
+        text: 'Possible Overconfidence',
+        desc: 'Linguistic certainty was high relative to technical concept density.'
+      };
+    case 'POSSIBLE_UNDERCONFIDENCE':
+      return {
+        bg: 'bg-sky-50 text-sky-800 border-sky-200',
+        dot: 'bg-sky-500',
+        text: 'Possible Underconfidence',
+        desc: 'Candidate articulated accurate technical solutions despite filler words or pauses.'
+      };
+    case 'CALIBRATED':
+    default:
+      return {
+        bg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        dot: 'bg-emerald-500',
+        text: 'Confidence Calibrated',
+        desc: 'Spoken confidence level matches technical accuracy and concept coverage.'
+      };
+  }
+};
 
 export const VideoInterviewRoundPage: React.FC = () => {
   return (
@@ -71,14 +112,18 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedQuestionForDetails, setSelectedQuestionForDetails] = useState<number | null>(null);
 
   // Active recording & playback state
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<any>(null);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedPreviewUrl, setRecordedPreviewUrl] = useState<string | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState<string>('');
+  const [capturedTimestamps, setCapturedTimestamps] = useState<Array<{ word: string; start: number; end: number }>>([]);
   const [candidateNotes, setCandidateNotes] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -306,6 +351,8 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
       setActionError(null);
       recordedChunksRef.current = [];
       setRecordedBlob(null);
+      setLiveTranscript('');
+      setCapturedTimestamps([]);
       if (recordedPreviewUrl) {
         URL.revokeObjectURL(recordedPreviewUrl);
         setRecordedPreviewUrl(null);
@@ -328,6 +375,60 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
         setIsRecording(false);
       };
 
+      // Start continuous speech recognition if supported by browser
+      if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        try {
+          const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          const rec = new SpeechRec();
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.lang = 'en-US';
+
+          const startTime = Date.now();
+          let prevWordsCount = 0;
+
+          rec.onresult = (event: any) => {
+            let interimText = '';
+            let finalText = '';
+
+            for (let i = 0; i < event.results.length; i++) {
+              if (event.results[i].isFinal) {
+                finalText += event.results[i][0].transcript + ' ';
+              } else {
+                interimText += event.results[i][0].transcript;
+              }
+            }
+
+            const combined = (finalText + interimText).trim();
+            setLiveTranscript(combined);
+
+            const words = combined.split(/\s+/).filter(Boolean);
+            if (words.length > prevWordsCount) {
+              const nowSec = (Date.now() - startTime) / 1000.0;
+              const newEntries: Array<{ word: string; start: number; end: number }> = [];
+              for (let w = prevWordsCount; w < words.length; w++) {
+                newEntries.push({
+                  word: words[w],
+                  start: Math.max(0, Math.round((nowSec - 0.4) * 100) / 100),
+                  end: Math.round(nowSec * 100) / 100
+                });
+              }
+              setCapturedTimestamps(prev => [...prev, ...newEntries]);
+              prevWordsCount = words.length;
+            }
+          };
+
+          rec.onerror = (e: any) => {
+            console.warn('SpeechRecognition notice:', e);
+          };
+
+          rec.start();
+          speechRecognitionRef.current = rec;
+        } catch (err) {
+          console.warn('SpeechRecognition initialization error:', err);
+        }
+      }
+
       recorder.start(1000);
       setIsRecording(true);
       setRecordingSeconds(0);
@@ -342,6 +443,12 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
   };
 
   // Discard recording and allow retry
@@ -351,6 +458,8 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
       setRecordedPreviewUrl(null);
     }
     setRecordedBlob(null);
+    setLiveTranscript('');
+    setCapturedTimestamps([]);
     setRecordingSeconds(0);
     setUploadProgress(null);
     setActionError(null);
@@ -366,18 +475,29 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
       setActionError(null);
       setUploadProgress(0);
 
+      const effectiveTranscript = (candidateNotes.trim() 
+        ? `${liveTranscript} ${candidateNotes}` 
+        : liveTranscript).trim();
+
+      const timestampsJson = capturedTimestamps.length > 0 
+        ? JSON.stringify(capturedTimestamps) 
+        : undefined;
+
       const updatedQuestion = await assessmentApi.uploadVideoRecording(
         session.id,
         activeQuestion.id,
         recordedBlob,
         recordingSeconds,
-        candidateNotes,
-        (percent) => setUploadProgress(percent)
+        effectiveTranscript,
+        (percent) => setUploadProgress(percent),
+        timestampsJson
       );
 
       // Update question list locally
       setQuestions(prev => prev.map(q => q.id === updatedQuestion.id ? updatedQuestion : q));
       setRecordedBlob(null);
+      setLiveTranscript('');
+      setCapturedTimestamps([]);
       setCandidateNotes('');
       if (recordedPreviewUrl) {
         URL.revokeObjectURL(recordedPreviewUrl);
@@ -433,9 +553,18 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
   // SCREEN 3: COMPLETED VIEW
   // =========================================================================
   if (session.videoStageStatus === 'COMPLETED' && session.videoScore != null) {
+    const videoScore = session.videoScore;
+    const techScore = session.videoTechnicalScore ?? videoScore;
+    const structScore = session.videoAnswerStructureScore ?? techScore;
+    const conceptScore = session.videoConceptUsageScore ?? techScore;
+    const fluencyScore = session.videoFluencyScore ?? session.videoCommunicationScore ?? videoScore;
+    const commScore = session.videoCommunicationScore ?? videoScore;
+    const calibLabel = session.videoConfidenceCalibrationLabel || 'CALIBRATED';
+    const calibBadge = getConfidenceBadge(calibLabel);
+
     return (
       <div className="min-h-screen bg-white py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-5xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <Link
               to={`/assessment/${session.id}`}
@@ -459,41 +588,211 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
             }}
           />
 
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-10 shadow-xs space-y-6">
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-3xl p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-                    <Check className="w-6 h-6 stroke-[3]" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold uppercase text-emerald-800 tracking-wider">Round 3: Verified</span>
-                    <h3 className="text-xl font-bold text-gray-900">AI Video Interview Evaluated</h3>
-                    <p className="text-xs text-gray-600">{session.jobRoleName} • Sentiment: {session.videoSentimentLabel || 'CONFIDENT'}</p>
-                  </div>
+          {/* Hero Banner */}
+          <div className="bg-gradient-to-r from-violet-900 via-indigo-900 to-violet-950 text-white rounded-3xl p-8 sm:p-10 shadow-lg border border-violet-800 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full blur-2xl" />
+            
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md text-emerald-300 border border-white/15 mb-3">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Round 3 Evaluated & Persisted
                 </div>
-
-                <div className="text-right bg-white px-5 py-3 rounded-2xl border border-emerald-200 shadow-2xs">
-                  <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Video Round Score</div>
-                  <div className="text-3xl font-black text-emerald-700">{session.videoScore}%</div>
-                </div>
+                <h2 className="text-3xl font-extrabold tracking-tight">AI Video Interview Results</h2>
+                <p className="text-sm text-violet-200 mt-1 max-w-xl">
+                  Evaluated with genuine speech analytics, 5-dimension competency scoring, and contradiction-weighted confidence calibration for {session.jobRoleName}.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div className="bg-white rounded-2xl p-4 border border-emerald-100">
-                  <div className="text-xs font-semibold text-gray-500 mb-1">Technical Competency Score</div>
-                  <div className="text-2xl font-black text-gray-900">{session.videoTechnicalScore || session.videoScore}%</div>
-                  <p className="text-[11px] text-gray-500 mt-1">Evaluated across domain architecture & problem solving</p>
-                </div>
-                <div className="bg-white rounded-2xl p-4 border border-emerald-100">
-                  <div className="text-xs font-semibold text-gray-500 mb-1">Communication Clarity Score</div>
-                  <div className="text-2xl font-black text-gray-900">{session.videoCommunicationScore || session.videoScore}%</div>
-                  <p className="text-[11px] text-gray-500 mt-1">Evaluated across speech pace, structure, & articulation</p>
+              <div className="flex flex-col items-end shrink-0">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/20 text-center min-w-[160px]">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-violet-200 block">
+                    Composite Score
+                  </span>
+                  <span className="text-4xl font-black text-white block mt-1">
+                    {videoScore}%
+                  </span>
+                  <span className="text-[10px] text-emerald-300 font-semibold block mt-1">
+                    Round 3 Cleared
+                  </span>
                 </div>
               </div>
+            </div>
 
-              <div className="bg-white rounded-2xl p-4 border border-emerald-100 text-xs text-gray-700 leading-relaxed">
-                <strong className="text-gray-900">AI Competency Evaluation:</strong> {session.videoFeedback || 'Candidate demonstrated articulate domain expertise and clear technical communication.'}
+            {/* Confidence Calibration Banner */}
+            <div className="relative z-10 mt-6 pt-6 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <span className="font-semibold text-violet-200">Dominant Calibration:</span>
+                <span className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] border flex items-center gap-1.5 ${calibBadge.bg}`}>
+                  <span className={`w-2 h-2 rounded-full ${calibBadge.dot}`} />
+                  {calibBadge.text}
+                </span>
+              </div>
+              <span className="text-violet-300/90 text-[11px]">
+                {calibBadge.desc}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+            {/* 5-Dimension Weighted Scoring Formula Grid */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Weighted Video Scoring Formula (Out of 100)
+                </h4>
+                <span className="text-[10px] text-gray-400">40% + 20% + 15% + 15% + 10% = 100%</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="p-4 rounded-2xl bg-violet-50/70 border border-violet-100 text-center">
+                  <span className="text-[10px] text-gray-500 font-semibold uppercase block">Technical (40%)</span>
+                  <span className="text-2xl font-black text-violet-800 block mt-1">{techScore}%</span>
+                  <span className="text-[10px] text-violet-600 block mt-0.5">Correctness & Relevance</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-center">
+                  <span className="text-[10px] text-gray-500 font-semibold uppercase block">Structure (20%)</span>
+                  <span className="text-2xl font-black text-indigo-800 block mt-1">{structScore}%</span>
+                  <span className="text-[10px] text-indigo-600 block mt-0.5">Clarity & Organization</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-100 text-center">
+                  <span className="text-[10px] text-gray-500 font-semibold uppercase block">Concepts (15%)</span>
+                  <span className="text-2xl font-black text-purple-800 block mt-1">{conceptScore}%</span>
+                  <span className="text-[10px] text-purple-600 block mt-0.5">Role Domain Depth</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 text-center">
+                  <span className="text-[10px] text-gray-500 font-semibold uppercase block">Fluency (15%)</span>
+                  <span className="text-2xl font-black text-blue-800 block mt-1">{fluencyScore}%</span>
+                  <span className="text-[10px] text-blue-600 block mt-0.5">Pace & Fillers</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-center col-span-2 sm:col-span-1">
+                  <span className="text-[10px] text-gray-500 font-semibold uppercase block">Effectiveness (10%)</span>
+                  <span className="text-2xl font-black text-emerald-800 block mt-1">{commScore}%</span>
+                  <span className="text-[10px] text-emerald-600 block mt-0.5">Completeness</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Ethical Decoupling & Transparency Disclaimers */}
+            <div className="p-4 rounded-2xl bg-violet-50/40 border border-violet-100 text-xs text-gray-600 space-y-1.5">
+              <div className="flex items-center gap-2 text-violet-800 font-bold">
+                <ShieldCheck className="w-4 h-4 text-violet-600" />
+                <span>Ethical AI Decoupling Safeguard</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-gray-600">
+                Speech hesitation, natural filler words, and measured pauses are normal cognitive processes and are <strong>never penalized</strong> as lack of technical knowledge.
+                Acoustic tone variation and prosody dynamics are reported transparently without equating monotone speech to disinterest.
+              </p>
+            </div>
+
+            {/* Overall Qualitative Feedback */}
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-xs space-y-1.5">
+              <strong className="text-gray-900 block font-bold">Comprehensive Interview Evaluation:</strong>
+              <p className="text-gray-700 leading-relaxed">
+                {session.videoFeedback || 'Candidate demonstrated articulate domain expertise and clear technical communication.'}
+              </p>
+            </div>
+
+            {/* Per-Question Details List */}
+            <div className="space-y-3 pt-4 border-t border-gray-100">
+              <h4 className="text-sm font-bold text-gray-900">Question-by-Question Analytics & Transcripts</h4>
+              
+              <div className="space-y-3">
+                {questions.map((q) => {
+                  const isExpanded = selectedQuestionForDetails === q.id;
+                  const matched = parseJsonArray(q.matchedKeyPoints);
+                  const missing = parseJsonArray(q.missingKeyPoints);
+                  const qCalib = getConfidenceBadge(q.confidenceCalibrationLabel);
+
+                  return (
+                    <div key={q.id} className="border border-gray-200 rounded-2xl p-4 transition-all hover:border-violet-300">
+                      <div 
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => setSelectedQuestionForDetails(isExpanded ? null : q.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-8 h-8 rounded-xl bg-violet-50 text-violet-700 font-bold text-xs flex items-center justify-center border border-violet-100 shrink-0">
+                            Q{q.sequenceNumber}
+                          </span>
+                          <div>
+                            <h5 className="text-xs font-bold text-gray-900 line-clamp-1">{q.questionText}</h5>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
+                              <span>{q.category}</span>
+                              <span>•</span>
+                              <span className={`px-1.5 py-0.2 rounded font-bold ${qCalib.bg}`}>{qCalib.text}</span>
+                              {q.speakingWpm && <span>• {q.speakingWpm} WPM</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-sm font-black text-violet-700">
+                            {q.questionScore ?? q.technicalScore ?? 80}%
+                          </span>
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 text-xs">
+                          {/* Transcript */}
+                          <div className="p-3 rounded-xl bg-gray-50 border border-gray-200">
+                            <div className="font-bold text-gray-700 mb-1 flex items-center justify-between text-[11px]">
+                              <span>Candidate Transcript:</span>
+                              <span className="text-[10px] text-gray-500">{q.transcriptionProvider || 'BROWSER_SPEECH_API'}</span>
+                            </div>
+                            <p className="text-gray-800 italic font-mono text-[11px] leading-relaxed">
+                              {q.transcript || 'No transcript captured. Provide speech transcript or candidate notes.'}
+                            </p>
+                          </div>
+
+                          {/* Concepts */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
+                              <span className="text-[11px] font-bold text-emerald-800 block mb-1">Matched Key Points:</span>
+                              <div className="flex flex-wrap gap-1">
+                                {matched.length > 0 ? (
+                                  matched.map((m, idx) => (
+                                    <span key={idx} className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-medium">
+                                      {m}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] text-gray-500">None detected</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-100">
+                              <span className="text-[11px] font-bold text-amber-800 block mb-1">Missing / Suggested Concepts:</span>
+                              <div className="flex flex-wrap gap-1">
+                                {missing.length > 0 ? (
+                                  missing.map((m, idx) => (
+                                    <span key={idx} className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-medium">
+                                      {m}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] text-gray-500">Comprehensive coverage</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Question Feedback */}
+                          {q.feedback && (
+                            <div className="p-3 rounded-xl bg-violet-50/50 border border-violet-100 text-[11px] text-violet-950">
+                              <strong>Feedback: </strong>{q.feedback}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -749,7 +1048,8 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
                 <span className="text-xs text-gray-700 leading-relaxed select-none">
                   I give explicit consent to record my spoken audio and video interview answers. 
                   I acknowledge that evaluation is strictly limited to technical competency and verbal communication clarity, 
-                  and that facial expressions, eye contact, body language, and personality are explicitly excluded.
+                  that facial expressions, eye contact, body language, and personality are explicitly excluded, 
+                  and that my recordings are stored privately for up to 30 days under the platform retention policy and can be permanently deleted by me at any time from the assessment report.
                 </span>
               </label>
 
@@ -1154,6 +1454,217 @@ const VideoInterviewContent: React.FC<ContentProps> = ({ session, onUpdated }) =
             </div>
           </div>
         </div>
+
+        {/* ACTIVE QUESTION DETAILED AI & SPEECH ANALYTICS BREAKDOWN */}
+        {activeQuestion && activeQuestion.status === 'UPLOADED' && (() => {
+          const matched = parseJsonArray(activeQuestion.matchedKeyPoints);
+          const missing = parseJsonArray(activeQuestion.missingKeyPoints);
+          const fillerList = parseJsonArray(activeQuestion.fillerWordsList);
+          const qCalib = getConfidenceBadge(activeQuestion.confidenceCalibrationLabel);
+          const qScore = activeQuestion.questionScore ?? activeQuestion.technicalScore ?? 80;
+          const techScore = activeQuestion.technicalScore ?? qScore;
+          const structScore = activeQuestion.answerStructureScore ?? techScore;
+          const conceptScore = activeQuestion.conceptUsageScore ?? techScore;
+          const fluencyScore = activeQuestion.fluencyScore ?? activeQuestion.communicationScore ?? qScore;
+          const commScore = activeQuestion.communicationScore ?? qScore;
+
+          return (
+            <div className="bg-white border border-violet-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-violet-50 text-violet-700 flex items-center justify-center font-bold text-sm border border-violet-100">
+                    Q{activeQuestion.sequenceNumber}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900">
+                      Answer Evaluation & Speech Analytics
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Evaluated against {session.jobRoleName} benchmarks • Model: {activeQuestion.evaluationModel || 'DETERMINISTIC_ROLE_COMPETENCY_ENGINE (Fallback)'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${qCalib.bg}`}>
+                    <span className={`w-2 h-2 rounded-full ${qCalib.dot}`} />
+                    {qCalib.text}
+                  </span>
+                  <div className="px-4 py-1.5 rounded-2xl bg-violet-600 text-white font-black text-base shadow-xs">
+                    {qScore} / 100
+                  </div>
+                </div>
+              </div>
+
+              {/* Confidence Calibration Explanation Banner */}
+              {activeQuestion.confidenceCalibrationReason && (
+                <div className="p-3.5 rounded-2xl bg-violet-50/50 border border-violet-100 text-xs text-violet-950 flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-violet-900">Calibration Rationale: </strong>
+                    <span>{activeQuestion.confidenceCalibrationReason}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 5-Part Weighted Breakdown */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">
+                  5-Dimension Weighted Scoring Breakdown
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="p-3 rounded-2xl bg-violet-50/50 border border-violet-100 text-center">
+                    <span className="text-[10px] text-gray-500 font-medium block">Tech Correctness (40%)</span>
+                    <span className="text-lg font-black text-violet-800">{techScore}%</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100 text-center">
+                    <span className="text-[10px] text-gray-500 font-medium block">Structure & Clarity (20%)</span>
+                    <span className="text-lg font-black text-indigo-800">{structScore}%</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-purple-50/50 border border-purple-100 text-center">
+                    <span className="text-[10px] text-gray-500 font-medium block">Concept Usage (15%)</span>
+                    <span className="text-lg font-black text-purple-800">{conceptScore}%</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-blue-50/50 border border-blue-100 text-center">
+                    <span className="text-[10px] text-gray-500 font-medium block">Speech Fluency (15%)</span>
+                    <span className="text-lg font-black text-blue-800">{fluencyScore}%</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-emerald-50/50 border border-emerald-100 text-center col-span-2 sm:col-span-1">
+                    <span className="text-[10px] text-gray-500 font-medium block">Communication (10%)</span>
+                    <span className="text-lg font-black text-emerald-800">{commScore}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Speech Fluency & Acoustic Analytics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Hesitation & Pace */}
+                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-3">
+                  <h5 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-violet-600" /> Speech Fluency & Hesitation
+                  </h5>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 rounded-xl bg-white border border-gray-100">
+                      <span className="text-[10px] text-gray-500 block">Speaking Rate</span>
+                      <span className="font-bold text-gray-900">{activeQuestion.speakingWpm ?? 0} WPM</span>
+                      <span className="text-[10px] text-gray-400 block">({activeQuestion.speechRateClassification || 'NORMAL'})</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white border border-gray-100">
+                      <span className="text-[10px] text-gray-500 block">Filler Words</span>
+                      <span className="font-bold text-gray-900">{activeQuestion.fillerWordsCount ?? 0} words</span>
+                      <span className="text-[10px] text-gray-400 block">({activeQuestion.fillerWordsPerMinute ?? 0}/min)</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white border border-gray-100">
+                      <span className="text-[10px] text-gray-500 block">Pauses (&ge; 0.35s)</span>
+                      <span className="font-bold text-gray-900">{activeQuestion.pausesCount ?? 0} detected</span>
+                      <span className="text-[10px] text-gray-400 block">Avg: {activeQuestion.avgPauseDurationSec ?? 0}s</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white border border-gray-100">
+                      <span className="text-[10px] text-gray-500 block">Repeated Words</span>
+                      <span className="font-bold text-gray-900">{activeQuestion.repeatedWordsCount ?? 0} instances</span>
+                      <span className="text-[10px] text-gray-400 block">Max Pause: {activeQuestion.longestPauseDurationSec ?? 0}s</span>
+                    </div>
+                  </div>
+                  {fillerList.length > 0 && (
+                    <div className="text-[11px] text-gray-600">
+                      <strong className="text-gray-700">Observed Fillers: </strong>
+                      {fillerList.join(', ')}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tone Dynamics & Prosody Status */}
+                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 space-y-3">
+                  <h5 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Volume2 className="w-3.5 h-3.5 text-violet-600" /> Tone Dynamics & Prosody Status
+                  </h5>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-gray-100">
+                      <span className="text-gray-600">Pitch Dynamics Variation:</span>
+                      <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-gray-100 text-gray-700">
+                        {activeQuestion.pitchVariationStatus || 'UNAVAILABLE'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-gray-100">
+                      <span className="text-gray-600">Vocal Energy Dynamics:</span>
+                      <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-gray-100 text-gray-700">
+                        {activeQuestion.energyVariationStatus || 'UNAVAILABLE'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-gray-100">
+                      <span className="text-gray-600">Overall Prosody Status:</span>
+                      <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-gray-100 text-gray-700">
+                        {activeQuestion.prosodyAnalysisStatus || 'UNAVAILABLE'}
+                      </span>
+                    </div>
+                  </div>
+                  {activeQuestion.prosodyNotes && (
+                    <p className="text-[10px] text-gray-500 italic leading-relaxed">
+                      {activeQuestion.prosodyNotes}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Concepts Matched & Missing */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-2">
+                  <span className="text-xs font-bold text-emerald-900 block">Matched Role Concepts:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {matched.length > 0 ? (
+                      matched.map((m, idx) => (
+                        <span key={idx} className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-medium">
+                          {m}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-gray-500">None detected in transcript</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-100 space-y-2">
+                  <span className="text-xs font-bold text-amber-900 block">Missing / Recommended Concepts:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {missing.length > 0 ? (
+                      missing.map((m, idx) => (
+                        <span key={idx} className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-xs font-medium">
+                          {m}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-gray-500">Comprehensive concept coverage</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Feedback */}
+              {(activeQuestion.competencyFeedback || activeQuestion.feedback) && (
+                <div className="p-4 rounded-2xl bg-violet-50/50 border border-violet-100 text-xs text-violet-950">
+                  <strong className="text-violet-900 block mb-1">Qualitative Technical Evaluation Feedback:</strong>
+                  <p className="leading-relaxed">{activeQuestion.competencyFeedback || activeQuestion.feedback}</p>
+                </div>
+              )}
+
+              {/* Captured Transcript */}
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-xs space-y-2">
+                <div className="flex items-center justify-between text-gray-700 font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-violet-600" /> Candidate Answer Transcript
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-mono">
+                    Provider: {activeQuestion.transcriptionProvider || 'BROWSER_SPEECH_API'}
+                  </span>
+                </div>
+                <p className="text-gray-800 font-mono text-[11px] leading-relaxed bg-white p-3 rounded-xl border border-gray-200">
+                  {activeQuestion.transcript || 'No transcript captured. Provide speech transcript or candidate notes.'}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

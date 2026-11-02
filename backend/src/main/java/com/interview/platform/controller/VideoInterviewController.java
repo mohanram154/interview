@@ -78,6 +78,7 @@ public class VideoInterviewController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "duration", required = false) Integer durationSeconds,
             @RequestParam(value = "transcript", required = false) String transcript,
+            @RequestParam(value = "wordTimestamps", required = false) String wordTimestamps,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
         VideoQuestionDto dto = videoInterviewService.uploadQuestionRecording(
@@ -86,7 +87,8 @@ public class VideoInterviewController {
                 questionId,
                 file,
                 durationSeconds,
-                transcript
+                transcript,
+                wordTimestamps
         );
         return ResponseEntity.ok(ApiResponse.success("Recording uploaded and saved successfully.", dto));
     }
@@ -126,6 +128,19 @@ public class VideoInterviewController {
     ) {
         AssessmentSessionResponse response = videoInterviewService.finishVideoInterview(sessionId, principal.getId());
         return ResponseEntity.ok(ApiResponse.success("Round 3 (AI Video Interview) successfully evaluated and completed!", response));
+    }
+
+    /**
+     * Candidate self-service request to delete all video recordings for the session.
+     * Enforces user ownership and permanently purges physical media files.
+     */
+    @DeleteMapping("/recordings")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> deleteRecordings(
+            @PathVariable Long sessionId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        Map<String, Object> result = videoInterviewService.deleteCandidateRecordings(sessionId, principal.getId());
+        return ResponseEntity.ok(ApiResponse.success("Video and audio recordings have been permanently deleted.", result));
     }
 }
 

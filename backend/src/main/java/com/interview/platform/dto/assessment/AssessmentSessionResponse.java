@@ -22,6 +22,17 @@ public class AssessmentSessionResponse {
     private RoundDetailDto mcqRound;
     private RoundDetailDto videoRound;
 
+    // Detailed Video Analytics Metrics
+    private Double videoScore;
+    private Double videoTechnicalScore;
+    private Double videoCommunicationScore;
+    private Double videoFluencyScore;
+    private Double videoAnswerStructureScore;
+    private Double videoConceptUsageScore;
+    private String videoConfidenceCalibrationLabel;
+    private String videoSentimentLabel;
+    private String videoFeedback;
+
     // Final Outcome
     private Double finalCompositeScore;
     private String finalSummary;
@@ -32,6 +43,9 @@ public class AssessmentSessionResponse {
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
     private LocalDateTime videoConsentGivenAt;
+    private LocalDateTime recordingsRetentionExpiresAt;
+    private LocalDateTime recordingsDeletedAt;
+    private Boolean recordingsDeletedByUser;
 
     public static class RoundDetailDto {
         private String id; // "RESUME_EVALUATION", "MCQ_ASSESSMENT", "VIDEO_INTERVIEW"
@@ -137,6 +151,33 @@ public class AssessmentSessionResponse {
     public RoundDetailDto getVideoRound() { return videoRound; }
     public void setVideoRound(RoundDetailDto videoRound) { this.videoRound = videoRound; }
 
+    public Double getVideoScore() { return videoScore; }
+    public void setVideoScore(Double videoScore) { this.videoScore = videoScore; }
+
+    public Double getVideoTechnicalScore() { return videoTechnicalScore; }
+    public void setVideoTechnicalScore(Double videoTechnicalScore) { this.videoTechnicalScore = videoTechnicalScore; }
+
+    public Double getVideoCommunicationScore() { return videoCommunicationScore; }
+    public void setVideoCommunicationScore(Double videoCommunicationScore) { this.videoCommunicationScore = videoCommunicationScore; }
+
+    public Double getVideoFluencyScore() { return videoFluencyScore; }
+    public void setVideoFluencyScore(Double videoFluencyScore) { this.videoFluencyScore = videoFluencyScore; }
+
+    public Double getVideoAnswerStructureScore() { return videoAnswerStructureScore; }
+    public void setVideoAnswerStructureScore(Double videoAnswerStructureScore) { this.videoAnswerStructureScore = videoAnswerStructureScore; }
+
+    public Double getVideoConceptUsageScore() { return videoConceptUsageScore; }
+    public void setVideoConceptUsageScore(Double videoConceptUsageScore) { this.videoConceptUsageScore = videoConceptUsageScore; }
+
+    public String getVideoConfidenceCalibrationLabel() { return videoConfidenceCalibrationLabel; }
+    public void setVideoConfidenceCalibrationLabel(String videoConfidenceCalibrationLabel) { this.videoConfidenceCalibrationLabel = videoConfidenceCalibrationLabel; }
+
+    public String getVideoSentimentLabel() { return videoSentimentLabel; }
+    public void setVideoSentimentLabel(String videoSentimentLabel) { this.videoSentimentLabel = videoSentimentLabel; }
+
+    public String getVideoFeedback() { return videoFeedback; }
+    public void setVideoFeedback(String videoFeedback) { this.videoFeedback = videoFeedback; }
+
     public Double getFinalCompositeScore() { return finalCompositeScore; }
     public void setFinalCompositeScore(Double finalCompositeScore) { this.finalCompositeScore = finalCompositeScore; }
 
@@ -161,6 +202,15 @@ public class AssessmentSessionResponse {
     public LocalDateTime getVideoConsentGivenAt() { return videoConsentGivenAt; }
     public void setVideoConsentGivenAt(LocalDateTime videoConsentGivenAt) { this.videoConsentGivenAt = videoConsentGivenAt; }
 
+    public LocalDateTime getRecordingsRetentionExpiresAt() { return recordingsRetentionExpiresAt; }
+    public void setRecordingsRetentionExpiresAt(LocalDateTime recordingsRetentionExpiresAt) { this.recordingsRetentionExpiresAt = recordingsRetentionExpiresAt; }
+
+    public LocalDateTime getRecordingsDeletedAt() { return recordingsDeletedAt; }
+    public void setRecordingsDeletedAt(LocalDateTime recordingsDeletedAt) { this.recordingsDeletedAt = recordingsDeletedAt; }
+
+    public Boolean getRecordingsDeletedByUser() { return recordingsDeletedByUser; }
+    public void setRecordingsDeletedByUser(Boolean recordingsDeletedByUser) { this.recordingsDeletedByUser = recordingsDeletedByUser; }
+
     // Backward compatibility helper getters
     public String getResumeStageStatus() { return resumeRound != null ? resumeRound.getStatus() : "AVAILABLE"; }
     public Double getResumeScore() { return resumeRound != null ? resumeRound.getScore() : null; }
@@ -171,6 +221,5 @@ public class AssessmentSessionResponse {
     public boolean isMcqUnlocked() { return mcqRound != null && mcqRound.isUnlocked(); }
 
     public String getVideoStageStatus() { return videoRound != null ? videoRound.getStatus() : "LOCKED"; }
-    public Double getVideoScore() { return videoRound != null ? videoRound.getScore() : null; }
     public boolean isVideoUnlocked() { return videoRound != null && videoRound.isUnlocked(); }
 }

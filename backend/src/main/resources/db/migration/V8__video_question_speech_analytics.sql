@@ -6,3 +6,4 @@ ALTER TABLE video_interview_questions
     ADD COLUMN filler_words_count INT NULL,
     ADD COLUMN speech_clarity_level VARCHAR(50) NULL,
     ADD COLUMN sentiment_label VARCHAR(50) NULL;
+

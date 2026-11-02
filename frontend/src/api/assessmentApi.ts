@@ -5,7 +5,9 @@ import {
   ParsedResumeData, 
   ResumeEvaluationResult,
   VideoQuestion,
-  VideoInterviewStatus
+  VideoInterviewStatus,
+  AssessmentReport,
+  ReportHistoryItem
 } from '../types/assessment';
 
 export const assessmentApi = {
@@ -157,13 +159,17 @@ export const assessmentApi = {
     file: Blob | File,
     durationSeconds: number,
     transcript?: string,
-    onProgress?: (percent: number) => void
+    onProgress?: (percent: number) => void,
+    wordTimestamps?: string
   ): Promise<VideoQuestion> => {
     const formData = new FormData();
     formData.append('file', file, `answer_q${questionId}.webm`);
     formData.append('duration', String(durationSeconds));
     if (transcript && transcript.trim()) {
       formData.append('transcript', transcript.trim());
+    }
+    if (wordTimestamps && wordTimestamps.trim()) {
+      formData.append('wordTimestamps', wordTimestamps.trim());
     }
 
     const res = await apiClient.post<{ data: VideoQuestion }>(
@@ -203,8 +209,30 @@ export const assessmentApi = {
     return res.data.data;
   },
 
-  getFinalReport: async (sessionId: number | string): Promise<AssessmentSession> => {
-    const res = await apiClient.get<{ data: AssessmentSession }>(`/assessment-sessions/${sessionId}/report`);
+  getFinalReport: async (sessionId: number | string): Promise<AssessmentReport> => {
+    const res = await apiClient.get<{ data: AssessmentReport }>(`/assessment-sessions/${sessionId}/report`);
+    return res.data.data;
+  },
+
+  getAssessmentReport: async (sessionId: number | string): Promise<AssessmentReport> => {
+    const res = await apiClient.get<{ data: AssessmentReport }>(`/assessment-sessions/${sessionId}/report`);
+    return res.data.data;
+  },
+
+  getReportHistory: async (): Promise<ReportHistoryItem[]> => {
+    const res = await apiClient.get<{ data: ReportHistoryItem[] }>('/assessment-reports');
+    return res.data.data;
+  },
+
+  getSavedReportById: async (reportId: number | string): Promise<AssessmentReport> => {
+    const res = await apiClient.get<{ data: AssessmentReport }>(`/assessment-reports/${reportId}`);
+    return res.data.data;
+  },
+
+  deleteRecordings: async (sessionId: number | string): Promise<{ sessionId: number; deletedFilesCount: number; recordingsDeletedAt: string; message: string }> => {
+    const res = await apiClient.delete<{ data: { sessionId: number; deletedFilesCount: number; recordingsDeletedAt: string; message: string } }>(
+      `/assessment-sessions/${sessionId}/video/recordings`
+    );
     return res.data.data;
   },
 };
