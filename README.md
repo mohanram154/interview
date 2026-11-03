@@ -13,6 +13,31 @@
 InterviewVerse is an enterprise-grade technical assessment platform designed for engineering candidates and recruiters. It features a strict **3-Round Sequential Assessment Lifecycle** combining resume semantic matching, objective MCQ technical screening, and an AI-evaluated video interview with speech hesitation and contradiction-weighted confidence calibration, culminating in an authenticated, weighted final assessment scorecard.
 
 ---
+## OUTPUT
+## First page
+<img width="1905" height="1031" alt="image" src="https://github.com/user-attachments/assets/1556f653-3c85-44bc-b6bf-50564a6932ef" />
+
+## Authentication page
+<img width="1903" height="1035" alt="image" src="https://github.com/user-attachments/assets/8b2b837e-4ef1-4c03-a821-2d70a87a15a7" />
+
+## Dashboard
+<img width="1902" height="1037" alt="image" src="https://github.com/user-attachments/assets/1827a42e-4e52-42d4-888b-e217cff01e90" />
+
+## Interview page
+<img width="1912" height="1037" alt="image" src="https://github.com/user-attachments/assets/c2cc1300-3c20-4f10-a359-3965c830d18e" />
+
+## Technical evaluation page
+<img width="1906" height="1032" alt="image" src="https://github.com/user-attachments/assets/7f41ff08-1e95-4713-90aa-11ba148ada9d" />
+
+## Resume evaluation page
+<img width="1907" height="1037" alt="image" src="https://github.com/user-attachments/assets/e117945f-d8d1-4119-a01e-74bbda28957a" />
+
+## Video evaluation page
+<img width="1907" height="1037" alt="image" src="https://github.com/user-attachments/assets/892024f5-3d71-4a3d-a2f4-60f95fa8fd96" />
+
+## Final report page
+<img width="1906" height="1040" alt="image" src="https://github.com/user-attachments/assets/7583ef47-413f-4367-a1ed-904b4b98cc2c" />
+
 
 ## Table of Contents
 1. [Core Features & Sequential Lifecycle](#1-core-features--sequential-lifecycle)
